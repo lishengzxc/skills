@@ -1,34 +1,73 @@
 # application [[support|support]]
 
-本文档汇总阿里云百炼应用开发、插件集成与数据管理过程中的核心配置指引与常见问题。旨在帮助开发者快速定位接口调用、[[streaming-output|流式输出]]及知识库检索中的技术细节，并规范完成合规上架流程。平台持续迭代，接入前建议核对最新服务条款。
+百炼平台为开发者提供应用构建、数据管理及合规备案等方面的支持。本页面汇总了应用中心常见问题、数据管理注意事项以及相关服务协议，帮助开发者快速排查问题并了解平台使用规范。
 
-## 支持的模型与功能
-- **官方内置插件**：默认提供 Python 代码解释器、计算器、图片生成、夸克搜索、生成二维码、GitHub 搜索。部分高阶插件需通过工单申请开通，详见 [常见问题](../../raw/application-user-guide/application-[[support|support]]/application-faq.md)。
-- **自定义插件/函数**：支持通过标准协议注册外部 API。大模型将自动学习传入的参数定义，完成意图解析与结果透传，可与 [[agent-config]] 协同使用。
-- **RAG 检索增强**：多知识库采用并行检索架构，按用户配置计算相关性得分后选取 TopN 结果。适用于复杂问答、文本摘要及 [[rag-retrieval]] 场景。
-- **协议支持**：服务遵循标准化授权与数据合规要求，完整法律文本参见 [相关协议](../../raw/application-user-guide/application-[[support|support]]/application-related-agreements.md)。
+## 应用中心功能支持
 
-## 关键参数
-| 参数/标识 | 说明 |
-|---|---|
-| `stream=True` | 启用 HTTP 流式响应，适用于长文本实时渲染场景。 |
-| `incremental_output=True` | 配合流式使用，实现增量输出（避免重复返回历史累积内容）。 |
-| `MD5` | 数据管理上传接口必填项，用于校验文件传输完整性与防篡改。 |
-| `Authorization` | 唯一允许透传至自定义插件后端的请求头，其他自定义 Header 将被拦截。 |
+### 插件能力
 
-## 使用方式
-- **[[streaming-output|流式输出]]配置**：在 API 请求中同时声明 `stream=True` 与 `incremental_output=True` 可获取逐段生成的 Token。前端需通过 SSE 或 WebSocket 协议接收并拼接渲染。
-- **Markdown 解析**：模型默认输出标准 Markdown 语法（如 `**加粗**`）。业务侧需集成解析库（如 `marked.js`、`markdown-it`）进行 DOM 转换，不可直接渲染纯文本。
-- **检索效果调优**：测试 [[rag-retrieval]] 时若发现回复偏差，可在控制台点击反馈按钮勾选类型，或提取 `RequestId` 通过工单提交底层日志分析。
-- **合规备案流程**：接入通义系列模型上架应用市场或小程序前，需先完成 [[compliance-filing]]，并独立申请合作协议。详细指引参考 [常见问题](../../raw/application-user-guide/application-support/application-faq.md)。
+根据[常见问题](../../raw/application-user-guide/application-[[support|support]]/application-faq.md)，平台目前提供以下系统插件：
 
-## 限制和注意事项
-- **计费边界**：自定义插件功能本身暂不收费，但涉及 [[assistant-api]] 的 Prompt 优化、实际应用调用及测试窗调试均按标准 Token 计量计费。
-- **存储配额**：单业务空间文档上限为 10 万篇。结构化数据导入时，系统遇空行即终止解析（首行为空则判定为空文件），需提前清洗数据。
-- **文件规范**：PDF 后缀必须为全小写 `.pdf`，大写后缀将触发 `140010` 格式错误。
-- **架构差异**：Agent 侧重开发者自主编排插件模型与上下文逻辑；[[assistant-api]] 提供封装类接口便于快速调优与状态管理。
+- Python 代码解释器
+- 计算器
+- 图片生成
+- 夸克搜索
+- 生成二维码
+- GitHub 搜索
 
-> **注意**：自定义插件 Header 透传策略已明确限定仅支持 `Authorization`，业务侧若依赖其他自定义鉴权头（如 `X-Custom-Token`），需在插件网关层自行映射或通过参数体传递。平台计费与容量配额策略可能随产品迭代调整，请以控制台实时账单及最新公告为准。
+部分插件需申请后才可使用。自定义插件服务当前免费，但配置 [[agent]] API 时涉及 [[prompt|prompt]] 优化、应用调用及测试窗测试会产生费用。
+
+### Agent 与 Assistant API 的区别
+
+- **Agent**：用户可自行调整插件模型、基于上下文理解进行开发。
+- **Assistant API**：提供各类封装能力，方便调优。自定义 API 插件遵循协议传给大模型进行理解，函数参数会被学习并返回完整结果。
+
+> **注意**：自定义插件调用时不支持自定义 header 透传，仅支持 `authorization`。
+
+## 关键参数与使用方式
+
+### [[streaming|流式输出]]配置
+
+如需增量式回复（而非全量），设置以下参数：
+
+```python
+stream=True              # [[streaming|流式输出]]
+incremental_output=True  # 增量式[[streaming|流式输出]]
+```
+
+### RAG 检索机制
+
+- 检索顺序为**并行**：根据每个 [[knowledge-base]] 的用户配置并行检索，再按得分选取 TopN。
+- 若模型回复不准确，可点击回复下方的问题反馈按钮，或复制 `RequestId` 通过阿里云工单反馈。
+
+## 数据管理限制
+
+| 限制项 | 说明 |
+|--------|------|
+| 文件格式 | 支持 pdf/doc/docx，PDF 文件后缀必须为小写 `pdf`（错误码 140010） |
+| 文档数量上限 | 每个业务空间最多 10 万个文档，超出需提交工单申请扩容 |
+| 上传接口 MD5 参数 | 用于验证上传文件的完整性 |
+| 结构化数据导入 | 表格中出现空行后，后续数据不会被识别；首行为空则视为空文件 |
+
+## 合规备案
+
+接入通义千问大模型并上架应用市场或小程序平台时：
+
+1. 参考 [应用合规备案](https://help.aliyun.com/zh/model-studio/compliance-and-launch-filing-guide-for-ai-apps-powered-by-the-tongyi-model) 完成备案流程。
+2. 通过 [提交工单](https://smartservice.console.aliyun.com/service/create-ticket) 申请通义千问系列模型的合作协议。
+
+## 相关协议
+
+根据[相关协议](../../raw/application-user-guide/application-[[support|support]]/application-related-agreements.md)文档，使用百炼平台需遵守以下条款：
+
+- [阿里云百炼服务协议](https://terms.alicdn.com/legal-agreement/terms/common_platform_service/20230728213935489/20230728213935489.html)
+- [阿里云百炼服务特别说明](https://help.aliyun.com/zh/model-studio/bailian-service-notes)
+- [开源模型协议条款说明](https://help.aliyun.com/zh/model-studio/open-source-model-terms)
+
+## 注意事项
+
+- AI 输出中的 `**xxx**` 是 Markdown 加粗标识，前端渲染时需解析 MD 语法做对应展示。
+- 如遇到应用回复质量问题，建议先检查 [[prompt]] 配置和知识库内容质量，再通过工单反馈。
 
 ## 来源文档
 

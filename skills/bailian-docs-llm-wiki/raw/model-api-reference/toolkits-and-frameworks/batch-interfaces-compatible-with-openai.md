@@ -6,7 +6,7 @@
 
 ## **工作流程**
 
-![image](https://help-static-aliyun-doc.aliyuncs.com/assets/img/zh-CN/8534149771/CAEQaxiBgIDB5qWk4BkiIDViYzQ0MWUwNTYyNDQ3NDM5NzM0ZTc4N2Y3NTU2NjA56318723_20260129171731.699.svg)
+![image](https://help-static-aliyun-doc.aliyuncs.com/assets/img/zh-CN/6104789771/CAEQaxiBgIDB5qWk4BkiIDViYzQ0MWUwNTYyNDQ3NDM5NzM0ZTc4N2Y3NTU2NjA56318723_20260129171731.699.svg)
 
 ## **前提条件**
 
@@ -2741,7 +2741,7 @@ curl -X POST --location "https://dashscope.aliyuncs.com/compatible-mode/v1/batch
         
     -   下载并分析 `error_file_id` 的错误详情
         
-    -   对于常见错误码，参考[错误信息](https://help.aliyun.com/zh/model-studio/error-code)进行解决
+    -   对于常见错误码，参考[错误码](https://help.aliyun.com/zh/model-studio/error-code)进行解决
         
 -   **成本优化**
     
@@ -2875,7 +2875,7 @@ with open("result.jsonl", "r") as fin:
 
 ## 错误码
 
-调用失败时，请参见[错误信息](https://help.aliyun.com/zh/model-studio/error-code)进行解决。
+调用失败时，请参见[错误码](https://help.aliyun.com/zh/model-studio/error-code)进行解决。
 
 ## **常见问题**
 
