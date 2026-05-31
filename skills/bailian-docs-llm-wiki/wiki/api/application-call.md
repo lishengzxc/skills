@@ -1,51 +1,130 @@
 # application call
 
-本文档介绍如何通过 API 调用阿里云百炼平台的应用（智能体与工作流）。平台提供原生 DashScope 协议与 OpenAI 兼容的 Responses API 两种接入方式，全面支持同步/异步执行、流式/非[[streaming-output|流式输出]]及多轮会话交互。开发者可基于现有代码库快速集成，或根据实时性与业务复杂度灵活选择调用模式。
+阿里云百炼平台支持通过 API 调用已创建的**智能体**和**工作流**应用。平台提供两套 API 体系：DashScope API 和 OpenAI 兼容的 Responses API，均支持单轮/多轮对话、[[streaming|流式输出]]、参数传递等核心功能。调用前需获取 APP ID 和 [[api-key]]，并根据应用所在业务空间决定是否需要 Workspace ID。
 
-## 支持的模型与功能
-- **应用类型**：支持调用 [[智能体应用]]（含新版 Agent 2.0）与 [[工作流应用]]。
-- **协议体系**：
-  - **DashScope 原生 API**：提供完整参数控制，Endpoint 为 `POST https://dashscope.aliyuncs.com/api/v1/apps/{APP_ID}/completion`。
-  - **OpenAI 兼容 Responses API**：符合 OpenAI 规范，便于生态迁移，Endpoint 为 `POST https://dashscope.aliyuncs.com/api/v2/apps/agent/{APP_ID}/compatible-mode/v1/responses`。详细同步调用规范请参考 [同步调用 API 参考](../../raw/application-api-reference/application-call/openai-responses-api/synchronous-call-api-reference.md)。
-- **交互模式**：支持单轮查询、多轮上下文保持、SSE [[streaming-output|流式输出]]（适用于对话补全）以及后台异步任务提交。
-- **多模态能力**：支持纯文本、图像 URL (`input_image`) 及文件 URL (`input_file`) 输入，满足图文问答与文档分析场景。
+## 支持的应用类型
 
-## 关键参数说明
-| 参数名 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `app_id` | string | 是 | 目标应用唯一标识。需替换 URL 路径或请求体中的 `{APP_ID}`。 |
-| `workspace_id` | string | 条件 | 应用归属子业务空间时必须传入。凭证获取步骤详见 [获取APP ID和Workspace ID](../../raw/application-api-reference/application-call/obtain-the-app-id-and-workspace-id.md)。 |
-| `input` / `[[prompt|prompt]]` | string/array | 是 | 核心输入。DashScope 协议使用 `input.[[prompt|prompt]]`；OpenAI 协议支持字符串或 `messages` 对象数组。 |
-| `session_id` | string | 否 | 用于 DashScope 协议维持会话状态。首次调用后需从响应中提取并缓存。 |
-| `stream` | boolean | 否 | 是否开启[[streaming-output|流式输出]]。默认为 `false`。开启后服务端以 SSE 格式逐块返回增量文本。 |
-| `background` | boolean | 否 | 是否转为异步任务。默认为 `false`。设为 `true` 时立即返回 `task_id`，需轮询获取结果。 |
-| `biz_params` | object | 否 | 透传自定义业务参数至工作流开始节点或智能体插件，键名需与 [[应用参数配置]] 完全一致。 |
+- **智能体应用**（含新版 Agent 2.0）：支持文本对话、图像输入、文件输入、插件调用等
+- **工作流应用**：支持文本对话、自定义参数传递、插件参数传递等
 
-## 使用方式
-### 1. 凭证与环境准备
-调用前需获取 `APP ID`，并配置环境变量 `DASHSCOPE_API_KEY`。建议使用官方 [[DashScope SDK]] 或 [[OpenAI Python SDK]] 进行请求封装，以简化鉴权与重试逻辑。
+> **注意**：以上所有 API 文档目前**仅适用于中国大陆版（北京地域）**。德国（法兰克福）地域的调用需额外提供 Workspace ID。
 
-### 2. 多轮对话实现
-- **DashScope 协议**：依赖服务端托管的 `session_id`。客户端在后续请求中透传上一次响应的 `session_id` 即可自动续接上下文。该会话 ID 在最后一次交互后 1 小时内有效。
-- **OpenAI 兼容协议**：需客户端自行维护消息历史。每次请求需将包含完整 `system`、`user`、`assistant` 角色的 `input` 数组整体传入。
-> **注意**：不同文档对上下文维护机制的说明存在演进差异。基于 OpenAI Responses API 的 `pre_response_id` 或 `conversation_id` 自动托管功能当前**尚未开放**，请务必采用客户端缓存并全量传递消息数组的方式实现多轮对话，避免因服务端未记录历史导致上下文丢失。
+## 前置准备
 
-### 3. 异步任务与状态轮询
-针对耗时较长的报告生成或复杂工作流，推荐启用异步模式。在请求体中设置 `background: true`，获取 `task_id` 后通过 SDK 的 `retrieve()` 方法或 REST API 定期查询任务状态。终态包含 `completed`（成功）、`failed`（失败）或 `cancelled`（已取消）。完整异步调度与轮询示例请参考 [异步调用API参考](../../raw/application-api-reference/application-call/openai-responses-api/asynchronous-call-api-reference.md)。
-> **注意**：异步任务 (`background=true`) 与流式输出 (`stream=true`) **互斥**，当前版本不支持在异步模式下开启 `stream`，请勿在请求体中同时设置这两个参数。
+调用应用 API 前需完成以下步骤：
 
-## 限制与注意事项
-- **地域限制**：当前 API 调用端点仅适用于中国大陆版（北京地域）。调用德国（法兰克福）等地域模型时需严格校验 `workspace_id` 并使用对应 Global Endpoint。
-- **配置生效依赖**：若在控制台修改了视觉模型选型（需切换至 [[通义千问VL系列]]）、文件处理策略（需设为全文引用或切片检索）或工作流节点的流式开关，**必须重新发布应用**，否则 API 调用将沿用旧版配置或返回参数不匹配错误。
-- **文件输入约束**：`input_file` 参数仅支持 [[智能体应用]]，[[工作流应用]] 暂不支持通过 API 直传文件对象。
-- **权限管控**：`Workspace ID` 的查询依赖 RAM 权限体系。子账号默认仅能查看已加入的业务空间，查询全量 ID 需主账号或具备 `AliyunBailianFullAccess` 策略授权的子账号操作。
-- **调试建议**：在代码集成前，建议优先使用控制台 **应用卡片 -> 发布 -> API 调试** 路径验证参数组合与业务逻辑，确认响应结构符合预期后再进行生产环境联调。
+1. **创建应用**：在[应用管理](https://bailian.console.aliyun.com/?tab=app#/app-center)中创建智能体或工作流应用
+2. **获取 APP ID**：从应用管理页面复制目标应用的 APP ID（详见 [获取APP ID和Workspace ID](../../raw/application-api-reference/application-call/obtain-the-app-id-and-workspace-id.md)）
+3. **获取 API Key**：通过[密钥管理](https://bailian.console.aliyun.com/?tab=app#/api-key)获取，并配置到环境变量 `DASHSCOPE_API_KEY`
+4. **安装 SDK（可选）**：根据所选 API 体系安装对应的 [[sdk]]
+
+如果应用位于**子业务空间**，还需同时提供 Workspace ID。目前 APP ID 和 Workspace ID 只能通过控制台手动获取，不支持通过 API 或 CLI 查询。
+
+## 两套 API 体系
+
+### DashScope API
+
+DashScope API 是百炼原生的应用调用接口，功能最全面。
+
+- **Endpoint**：`POST https://dashscope.aliyuncs.com/api/v1/apps/{APP_ID}/completion`
+- **SDK 支持**：Python（`dashscope`）、Java（`dashscope-sdk`）
+- **HTTP 支持**：curl、PHP、Node.js、C#、Go
+- **适用范围**：智能体（含新版 Agent 2.0）、工作流
+
+详细参数和示例参见 [应用 API 参考](../../raw/application-api-reference/application-call/application-dashscope-api-reference/agent-and-workflow-application-api-reference.md)。新版智能体（Agent 2.0）的专用参数参见 [新版智能体应用 API 参考](../../raw/application-api-reference/application-call/application-dashscope-api-reference/new-agent-application-api-reference.md)。
+
+基本调用示例（Python）：
+
+```python
+import os
+from dashscope import Application
+
+response = Application.call(
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    app_id='APP_ID',
+    [[prompt|prompt]]='你是谁？'
+)
+print(response.output.text)
+```
+
+### OpenAI Responses API
+
+Responses API 兼容 OpenAI 协议，便于复用现有 OpenAI 生态代码和工具。
+
+- **Endpoint**：`POST https://dashscope.aliyuncs.com/api/v2/apps/agent/{APP_ID}/compatible-mode/v1/responses`
+- **SDK 支持**：OpenAI Python SDK、OpenAI Java SDK
+- **调用模式**：同步调用、异步调用（`background=true`）
+
+基本调用示例（Python）：
+
+```python
+from openai import OpenAI
+import os
+
+client = OpenAI(
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    base_url=f'https://dashscope.aliyuncs.com/api/v2/apps/agent/{app_id}/compatible-mode/v1/'
+)
+response = client.responses.create(input="你是谁？")
+```
+
+## 关键功能
+
+### 多轮对话
+
+两套 API 的多轮对话实现方式不同：
+
+| 特性 | DashScope API | Responses API |
+|------|--------------|---------------|
+| 上下文维护 | 通过 `session_id`（服务端管理） | 通过 `input` 消息数组（客户端管理） |
+| 首次请求 | 不传 `session_id`，响应返回新 ID | 传入完整对话历史 |
+| 后续请求 | 携带上次响应的 `session_id` | 追加新消息到数组 |
+| 有效期 | `session_id` 最后请求后 1 小时有效 | 无限制（客户端自行维护） |
+
+> **注意**：Responses API 中基于 `pre_response_id` 或 `conversation_id` 的上下文功能**尚未支持**，目前需在每次请求时传递完整对话历史。
+
+### [[streaming|流式输出]]
+
+- **DashScope API**：通过设置 `stream=True` 启用
+- **Responses API**：通过设置 `stream=true` 启用
+- **工作流应用**需在结束节点或流程输出节点中启用**[[streaming|流式输出]]**开关并重新发布
+
+### 异步调用
+
+Responses API 支持异步模式，适用于耗时较长的任务（如报告生成、多步骤工具调用），避免请求超时。核心流程：
+
+1. 创建任务时设置 `background=true`，立即获取任务 ID
+2. 通过 `retrieve` 方法轮询任务状态
+3. 状态变为 `completed`/`failed`/`cancelled` 时获取结果
+
+> **注意**：异步任务**不支持**流式输出（`stream=true`）。
+
+### 多模态输入
+
+Responses API 支持在 `content` 数组中传入多种类型：
+
+- **图像输入**（`input_image`）：需选用通义千问 VL 系列模型
+- **文件输入**（`input_file`）：仅智能体应用支持，需配置文件处理方式（全文引用或切片检索）
+
+### 参数传递
+
+- **自定义参数**：DashScope API 通过 `biz_params` 传递；Responses API 通过 `extra_body.biz_params` 传递
+- **插件参数**：在应用中配置插件工具后，通过 API 传入对应参数
+
+## 限制和注意事项
+
+- APP ID 和 Workspace ID 目前仅支持通过控制台手动获取
+- 默认业务空间下的应用只需 APP ID；子业务空间下的应用需同时提供 APP ID 和 Workspace ID
+- 不建议在生产环境中将 API Key 硬编码到代码中，应通过环境变量配置
+- RAM 子账号访问"业务空间管理"页面需要 [[permission-management]] 中的超级管理员权限
+- DashScope Java SDK 建议版本 >= 2.12.0
+- 在线调试可通过**应用卡片 → 发布 → API 调试**进入
 
 ## 来源文档
 
 - [获取APP ID和Workspace ID](../../raw/application-api-reference/application-call/obtain-the-app-id-and-workspace-id.md)
-- [应用 API 参考](../../raw/application-api-reference/application-call/application-dashscope-api-reference/agent-and-workflow-application-api-reference.md)
-- [同步调用 API 参考](../../raw/application-api-reference/application-call/openai-responses-api/synchronous-call-api-reference.md)
-- [异步调用API参考](../../raw/application-api-reference/application-call/openai-responses-api/asynchronous-call-api-reference.md)
 - [新版智能体应用 API 参考](../../raw/application-api-reference/application-call/application-dashscope-api-reference/new-agent-application-api-reference.md)
+- [异步调用API参考](../../raw/application-api-reference/application-call/openai-responses-api/asynchronous-call-api-reference.md)
+- [同步调用 API 参考](../../raw/application-api-reference/application-call/openai-responses-api/synchronous-call-api-reference.md)
+- [应用 API 参考](../../raw/application-api-reference/application-call/application-dashscope-api-reference/agent-and-workflow-application-api-reference.md)
 

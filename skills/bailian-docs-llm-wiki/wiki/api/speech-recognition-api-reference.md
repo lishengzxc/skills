@@ -1,95 +1,191 @@
 # speech recognition api reference
 
-阿里云百炼语音识别服务提供实时语音转写与录音文件异步转写两种核心模式，全面支持 Qwen-ASR、Paraformer 与 Fun-ASR 系列模型。开发者可通过 [[dashscope-sdk]]、OpenAI 兼容协议或原生 WebSocket/HTTP API 快速集成，并可根据业务需求配置定制热词、说话人分离、情感分析等高级能力。
+百炼平台提供多种语音识别（ASR）模型和 API，覆盖实时语音识别和录音文件识别两大场景。开发者可根据业务需求选择 Qwen-ASR、Fun-ASR 或 Paraformer 系列模型，并通过 OpenAI 兼容协议、DashScope SDK 或 WebSocket 等方式接入。本页面汇总各模型的接入方式、关键参数和使用限制。
 
-## 支持的模型与功能
-平台按应用场景将语音识别 API 分为实时流式识别与录音文件识别两大类，核心模型特性如下：
-| 模型系列 | 适用模式 | 核心特性 | 支持协议/SDK |
-|---|---|---|---|
-| **Qwen-ASR** | 实时/录音文件 | 多语种高精度、支持[[streaming-output|流式输出]]、VAD/Manual 双模式 | WebSocket、OpenAI 兼容、Python/Java SDK |
-| **Paraformer** | 实时/录音文件 | 默认标点预测与 ITN、支持情感识别（仅 8k-v2）、定制热词 | WebSocket、DashScope SDK (Java/Python/Android/iOS) |
-| **Fun-ASR** | 实时/录音文件 | 长音频支持强、多语种覆盖广、支持声道分离 | WebSocket、RESTful 异步、全平台 SDK |
+## 模型与功能总览
 
-> **注意**：Paraformer 情感识别功能仅限 `paraformer-realtime-8k-v2` 模型，且必须显式关闭语义断句（`semantic_punctuation_enabled=false`）。若同时开启语义断句，情感标签将无法正常返回。
+平台语音识别能力按场景分为**实时语音识别**和**录音文件识别**两大类，涉及三个模型系列：
 
-## 关键参数说明
-### 认证与路由
-- **鉴权方式**：HTTP Header 需携带 `Authorization: Bearer <api_key>`，或 WebSocket 握手阶段在 Header 传入。生产环境强烈建议使用临时鉴权 Token 替代长期 Key 以降低泄露风险，详见 [[api-key]]。
-- **地域路由**：中国内地与国际版端点严格隔离，API Key 不可混用。
-  - 中国内地：`dashscope.aliyuncs.com`
-  - 国际：`dashscope-intl.aliyuncs.com`
+### 实时语音识别
 
-### 音频输入参数
-| 参数名 | 类型 | 说明 |
-|---|---|---|
-| `file_urls` / `input` | array/object | 录音文件需传入公网可访问的 HTTP/HTTPS URL；实时流需按协议发送二进制 PCM/Opus 数据。 |
-| `format` | string | 支持 `pcm`, `wav`, `mp3`, `opus`, `aac`, `amr` 等。OPUS/SPEEX 需 Ogg 封装，WAV 需 PCM 编码。 |
-| `sample_rate` | integer | 依模型而定。`paraformer-realtime-v2` 支持任意采样率；v1 固定 16kHz；8k 系列仅支持 8000Hz。 |
-| `language_hints` | array | 预设识别语种，可提升准确率。部分模型仅读取数组首值，未配置时由模型自动推断。 |
+| 模型系列 | 推荐模型 | 采样率 | 主要语种 | 接入协议 |
+|---------|---------|--------|---------|---------|
+| **Qwen-ASR Realtime** | qwen3-asr-flash-realtime | 16000/8000 Hz | 中文、英文、日语、韩语、德语、法语、俄语等 30+ 语种 | WebSocket (Realtime API) |
+| **Fun-ASR** | fun-asr-realtime | 16000 Hz（8k 模型为 8000 Hz） | 中文（普通话及多种方言）、英文、日语 | WebSocket / DashScope SDK |
+| **Paraformer** | paraformer-realtime-v2 | 任意（v2）/ 16000 Hz（v1） | 中文（含方言）、英文、日语、韩语、德语、法语、俄语 | WebSocket / DashScope SDK |
 
-### 处理与输出控制
-- `vocabulary_id`：绑定通过 [[custom-hot-words]] 管理的热词列表 ID，提升专有名词召回率。
-- `disfluency_removal_enabled`：布尔值，控制是否过滤“呃、啊”等语气词，默认 `false`。
-- `diarization_enabled` / `speaker_count`：开启说话人分离并预估人数，适用于会议录音转写。
-- `turn_detection`：实时交互核心参数。配置 `server_vad` 开启服务端自动断句；设为 `null` 切换至 Manual 模式（由客户端主动控制语句边界）。
+### 录音文件识别
 
-## 调用方式
-### 1. SDK 快速接入
-推荐优先使用官方 [[dashscope-sdk]]。以 Python SDK 录音文件识别为例，核心类 `Transcription` 提供 `async_call()` 与 `wait()` 方法，支持提交后阻塞等待或异步轮询。
-> **注意**：部分旧版文档提及 Paraformer 录音文件支持同步直调，但当前服务端架构已全面转向异步任务队列（`PENDING` → `RUNNING` → `SUCCEEDED`），长任务直调极易触发网关超时，请严格遵循异步提交规范。
+| 模型系列 | 推荐模型 | 接入方式 | 关键特性 |
+|---------|---------|---------|---------|
+| **Qwen-ASR** | qwen3-asr-flash / qwen3-asr-flash-filetrans | OpenAI 兼容、DashScope 同步/异步 | 支持音频 URL 和 Base64 输入 |
+| **Fun-ASR** | fun-asr | DashScope 异步调用 / RESTful API | 支持说话人分离、批量处理（最多100个URL） |
+| **Paraformer** | paraformer-v2 | DashScope 异步调用 / RESTful API | 支持说话人分离、语气词过滤、时间戳校准 |
 
-### 2. [[openai-compatible-api|OpenAI 兼容接口]]
-适用于希望无缝迁移现有 LLM 代码库的开发者。通过 `chat/completions` 端点提交 `input_audio` 消息体即可触发识别，支持配置 `stream` 实现流式结果返回。详细参数映射与请求体结构可参考 [录音文件识别（Qwen-ASR）API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-api-reference.md)。
+> **注意**：Qwen-ASR 的 `qwen3-asr-flash-filetrans` 仅支持 DashScope 异步调用，而 `qwen3-asr-flash` 支持 OpenAI 兼容和 DashScope 同步调用两种方式。详见 [录音文件识别（Qwen-ASR）API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-api-reference.md)。
 
-### 3. WebSocket 实时流式协议
-适用于低延迟交互场景（如直播字幕、语音助手）。客户端建立连接后需立即发送 `run-task` 指令并等待 `task-started` 响应，随后持续追加二进制音频流。事件交互模型与完整 JSON 结构定义见 [实时语音识别（Paraformer）客户端事件](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/paraformer-client-events.md)。Qwen-ASR 实时流采用 `session.update` 与 `input_audio_buffer.append` 事件体系，交互逻辑略有差异。
+## 接入方式与协议
 
-### 4. RESTful 异步接口（录音文件）
-适用于大批量历史音频处理。流程分为两步：
-1. **提交任务**：`POST` 携带 `X-DashScope-Async: enable` 请求头与文件 URL 数组，获取 `task_id`。
-2. **轮询结果**：通过 `GET /tasks/{task_id}` 查询状态，直至返回 `SUCCEEDED` 或 `FAILED`。
-接口鉴权与完整请求示例详见 [Fun-ASR录音文件识别HTTP API参考](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/fun-asr-recorded-speech-recognition-http-api.md)。
+### OpenAI 兼容协议
 
-## 限制与注意事项
-1. **文件体积与时长**：单次录音文件限制为 2GB 且时长 ≤12 小时。若启用说话人分离（`diarization_enabled`），建议时长压缩至 2 小时内，否则可能触发处理中断。
-2. **URL 协议限制**：服务不支持本地文件直传或 Base64 编码音频。SDK 调用时**不支持** `oss://` 协议的临时链接，必须使用完整的 HTTP/HTTPS 公网 URL；仅 RESTful API 底层兼容 `oss://` 临时凭证（有效期 48 小时，严禁用于高并发生产环境）。
-3. **并发与限流**：文件上传凭证接口限流 100 QPS 且不可扩容。生产环境应统一使用稳定对象存储（如阿里云 OSS）预生成签名 URL。
-4. **队列排队机制**：文件转写服务采用尽力调度策略，任务提交后进入 `PENDING` 状态，排队时长受当前集群负载与音频长度影响，通常为数分钟至数十分钟。识别结果与下载链接仅保留 24 小时，请及时落库。
+仅 Qwen-ASR 的 `qwen3-asr-flash` 模型支持，使用标准的 `chat/completions` 端点：
+
+- **中国内地**：`https://dashscope.aliyuncs.com/compatible-mode/v1`
+- **国际**：`https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
+
+### WebSocket 协议
+
+实时语音识别的主要接入方式。不同模型系列使用不同的 WebSocket 端点：
+
+| 模型系列 | 中国内地端点 | 协议特点 |
+|---------|------------|---------|
+| Qwen-ASR Realtime | `wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model=<model_name>` | 通过 URL 查询参数指定模型；支持 VAD 和 Manual 两种模式 |
+| Fun-ASR / Paraformer | `wss://dashscope.aliyuncs.com/api-ws/v1/inference` | 通过 `run-task` 消息体中的 `model` 字段指定模型 |
+
+所有 WebSocket 连接均需在请求头中设置 `Authorization: Bearer <your_api_key>` 进行鉴权。详见 [Qwen-ASR实时语音识别WebSocket API](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-interaction-process.md)。
+
+### DashScope SDK
+
+提供 Python 和 Java SDK，封装了 WebSocket 交互细节：
+
+- **实时识别**：通过 `Recognition` 类（Fun-ASR/Paraformer）或 `OmniRealtimeConversation` 类（Qwen-ASR）调用
+- **录音文件识别**：通过 `Transcription` 类调用，支持异步提交 + 同步等待或异步查询两种模式
+
+### 移动端 SDK
+
+Paraformer 和 Fun-ASR 均提供 Android SDK（AAR 格式）和 iOS SDK（nuisdk.framework），通过 `initialize` → `startDialog` → `stopDialog` → `release` 的生命周期管理识别流程。
+
+## 关键参数
+
+### 通用鉴权参数
+
+| 参数 | 说明 |
+|-----|------|
+| `Authorization` | `Bearer <api_key>` 格式，中国内地和国际地域使用不同的 API Key |
+| `X-DashScope-WorkSpace` | 可选，[[workspace]] 业务空间 ID |
+| `X-DashScope-DataInspection` | 可选，数据合规检测开关 |
+
+### 实时识别参数
+
+**Paraformer / Fun-ASR（WebSocket `run-task` 消息）：**
+
+| 参数 | 类型 | 必选 | 说明 |
+|-----|------|-----|------|
+| `format` | string | 是 | 音频格式：pcm、wav、mp3、opus、speex、aac、amr |
+| `sample_rate` | integer | 是 | 采样率（Hz），因模型而异 |
+| `vocabulary_id` | string | 否 | [[custom-hot-words]] 热词列表 ID |
+| `language_hints` | array | 否 | 指定待识别语种 |
+| `semantic_punctuation_enabled` | boolean | 否 | 语义断句开关（默认 false） |
+| `disfluency_removal_enabled` | boolean | 否 | 语气词过滤（仅 Paraformer） |
+
+**Qwen-ASR Realtime（`session.update` 事件）：**
+
+| 参数 | 说明 |
+|-----|------|
+| `input_audio_format` | 支持 pcm 和 opus |
+| `sample_rate` | 支持 16000 和 8000 |
+| `turn_detection` | VAD 配置，设为 null 切换到 Manual 模式 |
+| `turn_detection.threshold` | VAD 检测阈值，推荐 0.0 |
+| `turn_detection.silence_duration_ms` | 静音断句阈值（ms），推荐 400 |
+
+### 录音文件识别参数
+
+| 参数 | 说明 |
+|-----|------|
+| `file_urls` | 公网可访问的音频文件 URL（不支持本地文件直传），单次最多 100 个 |
+| `channel_id` | 音轨索引 |
+| `diarization_enabled` | 说话人分离开关 |
+| `speaker_count` | 说话人数量参考值 |
+| `language_hints` | 待识别语种 |
+
+## 交互流程
+
+### 实时识别（Paraformer / Fun-ASR）
+
+采用标准 WebSocket 双工通信：
+
+1. 建立 WebSocket 连接
+2. 发送 `run-task` 指令 → 收到 `task-started` 事件
+3. 持续发送二进制音频流 → 实时接收 `result-generated` 事件
+4. 发送 `finish-task` 指令 → 收到 `task-finished` 事件
+5. 关闭连接
+
+详见 [Paraformer实时语音识别WebSocket API](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/websocket-for-paraformer-real-time-service.md)。
+
+### 实时识别（Qwen-ASR Realtime）
+
+支持两种交互模式：
+
+- **VAD 模式**（默认）：服务端自动检测语音起止点，返回 `speech_started` / `speech_stopped` 事件
+- **Manual 模式**：客户端通过 `input_audio_buffer.commit` 主动触发断句
+
+### 录音文件识别
+
+采用"提交-轮询"异步模式：
+
+1. 调用提交任务接口，获取 `task_id`
+2. 轮询查询任务接口，直到状态为 `SUCCEEDED` 或 `FAILED`
+3. 获取识别结果（结果 URL 有效期 24 小时）
+
+## 定制热词
+
+通过 [[custom-hot-words]] 功能可提升特定词汇的识别准确率。支持 HTTP API、Python SDK 和 Java SDK 三种管理方式，提供创建、查询、更新、删除热词列表的完整 CRUD 操作。
+
+关键约束：
+- 热词权重范围 [1, 5]，常用值为 4
+- `target_model` 必须与实际调用语音识别时使用的模型一致
+- 新加坡地域的子业务空间暂不支持热词功能
+
+## 限制和注意事项
+
+- **音频格式**：实时识别支持 pcm、wav、mp3、opus、speex、aac、amr；录音文件识别额外支持 flac、ogg、m4a 及多种视频格式
+- **音频要求**：实时识别须为**单声道**音频；录音文件不超过 2GB、时长不超过 12 小时
+- **文件输入限制**：录音文件识别不支持本地文件直传和 Base64 格式（Fun-ASR/Paraformer），需提供公网可访问的 URL
+
+> **注意**：使用 SDK 时，若录音文件存储在阿里云 OSS，不支持 `oss://` 前缀的临时 URL；使用 RESTful API 时则支持，但临时 URL 有效期仅 48 小时，不建议用于生产环境。
+
+- **视频文件处理**：建议使用 ffmpeg 预处理提取音轨并压缩，以提升转写效率：
+  ```shell
+  ffmpeg -i input-video -ac 1 -ar 16000 -acodec libopus output.opus
+  ```
+- **Paraformer 音频编码约束**：opus/speex 必须使用 Ogg 封装；wav 必须为 PCM 编码；amr 仅支持 AMR-NB
+- **SDK 版本要求**：Qwen-ASR Realtime 需要 DashScope Python SDK ≥ 1.25.6、Java SDK ≥ 2.22.5
+- **安全建议**：API Key 应配置到环境变量，移动端场景建议使用 [[temporary-api-key]]（有效期 60 秒）
 
 ## 来源文档
 
 - [录音文件识别（Qwen-ASR）API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-api-reference.md)
 - [Paraformer实时语音识别WebSocket API](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/websocket-for-paraformer-real-time-service.md)
+- [实时语音识别（Paraformer）客户端事件](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/paraformer-client-events.md)
 - [实时语音识别（Paraformer）服务端事件](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/paraformer-server-events.md)
 - [Paraformer实时语音识别Java SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/paraformer-real-time-speech-recognition-java-sdk.md)
-- [实时语音识别（Paraformer）客户端事件](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/paraformer-client-events.md)
 - [Paraformer实时语音识别Python SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/paraformer-real-time-speech-recognition-python-sdk.md)
 - [Paraformer实时语音识别Android SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/android-sdk-for-paraformer-real-time-service.md)
+- [Paraformer实时语音识别iOS SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/ios-sdk-for-paraformer-real-time-service.md)
 - [Fun-ASR实时语音识别WebSocket API](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/fun-asr-realtime-websocket-api.md)
 - [实时语音识别（Fun-ASR）客户端事件](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/fun-asr-client-events.md)
-- [Paraformer实时语音识别iOS SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-real-time-speech-recognition-api-reference/ios-sdk-for-paraformer-real-time-service.md)
 - [实时语音识别（Fun-ASR）服务端事件](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/fun-asr-server-events.md)
 - [Python SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/fun-asr-realtime-python-sdk.md)
 - [Java SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/fun-asr-realtime-java-sdk.md)
 - [Fun-ASR实时语音识别Android SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/android-sdk-for-fun-asr-real-time-service.md)
-- [Qwen-ASR实时语音识别WebSocket API](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-interaction-process.md)
 - [Fun-ASR实时语音识别iOS SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-real-time-speech-recognition-api-reference/ios-sdk-for-fun-asr-real-time-service.md)
-- [实时语音识别（Qwen-ASR-Realtime）Java SDK-API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-java-sdk.md)
-- [实时语音识别（Qwen-ASR-Realtime）Python SDK-API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-python-sdk.md)
-- [实时语音识别（Qwen-ASR-Realtime）服务端事件](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-server-events.md)
+- [Qwen-ASR实时语音识别WebSocket API](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-interaction-process.md)
 - [实时语音识别（Qwen-ASR-Realtime）客户端事件](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-client-events.md)
+- [实时语音识别（Qwen-ASR-Realtime）服务端事件](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-server-events.md)
+- [实时语音识别（Qwen-ASR-Realtime）Python SDK-API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-python-sdk.md)
+- [实时语音识别（Qwen-ASR-Realtime）Java SDK-API参考](../../raw/model-api-reference/speech-recognition-api-reference/qwen-asr-realtime-api/qwen-asr-realtime-java-sdk.md)
 - [Paraformer录音文件识别Java SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-recorded-speech-recognition-java-sdk.md)
 - [Paraformer录音文件识别Python SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-recorded-speech-recognition-python-sdk.md)
 - [Paraformer录音文件识别RESTful API](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-recorded-speech-recognition-restful-api.md)
-- [最佳实践](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-best-practices.md)
 - [Paraformer录音文件识别Android SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-recorded-speech-recognition-android-sdk.md)
 - [Paraformer录音文件识别iOS SDK](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-recorded-speech-recognition-ios-sdk.md)
+- [最佳实践](../../raw/model-api-reference/speech-recognition-api-reference/paraformer-recorded-speech-recognition-api-reference/paraformer-best-practices.md)
 - [Fun-ASR录音文件识别Python SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/funauidio-asr-recorded-speech-recognition-python-sdk.md)
-- [Fun-ASR录音文件识别HTTP API参考](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/fun-asr-recorded-speech-recognition-http-api.md)
 - [Fun-ASR录音文件识别Java SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/fun-asr-recorded-speech-recognition-java-sdk.md)
+- [Fun-ASR录音文件识别HTTP API参考](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/fun-asr-recorded-speech-recognition-http-api.md)
 - [Fun-ASR录音文件识别Android SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/fun-asr-recorded-speech-recognition-android-sdk.md)
 - [Fun-ASR录音文件识别iOS SDK](../../raw/model-api-reference/speech-recognition-api-reference/fun-asr-recorded-speech-recognition-api-reference/fun-asr-recorded-speech-recognition-ios-sdk.md)
-- [定制热词Java SDK参考](../../raw/model-api-reference/speech-recognition-api-reference/custom-hot-words/vocabulary-java-sdk.md)
 - [定制热词HTTP API参考](../../raw/model-api-reference/speech-recognition-api-reference/custom-hot-words/vocabulary-http-api.md)
+- [定制热词Java SDK参考](../../raw/model-api-reference/speech-recognition-api-reference/custom-hot-words/vocabulary-java-sdk.md)
 - [定制热词Python SDK参考](../../raw/model-api-reference/speech-recognition-api-reference/custom-hot-words/vocabulary-python-sdk.md)
 

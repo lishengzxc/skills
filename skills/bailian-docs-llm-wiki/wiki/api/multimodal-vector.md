@@ -1,52 +1,108 @@
 # multimodal vector
 
-多模态向量模型用于将文本、图像和视频映射至统一的语义向量空间，支持跨模态检索、相似度计算与内容聚类分析。开发者可通过百炼 DashScope 接口快速接入，根据业务场景灵活选择独立向量或融合向量生成模式。接口规范与完整参数定义详见 [Multimodal-Embedding API详情](../../raw/model-api-reference/multimodal-vector/multimodal-embedding-api-reference.md)。
+多模态向量（Multimodal Embedding）是百炼平台提供的一类模型能力，可将文本、图片和视频转换为同一语义空间中的向量表示，从而支持跨模态检索（以文搜图、以图搜视频等）、语义相似度计算和内容分类聚类。所有模态生成的向量位于统一空间，可直接通过余弦相似度等方法进行跨模态匹配。
 
-## 支持的模型与核心能力
-### 核心特性
-- **跨模态检索**：统一向量空间支持以文搜图、以图搜视频、多图混合查询等场景。
-- **语义相似度计算**：输出为 Dense 向量，可直接通过余弦相似度衡量不同模态内容的语义相关性。
-- **内容分类与聚类**：基于高维语义表征实现智能打标、分组与聚合分析。
+## 支持的模型
 
-### 模型矩阵
-平台提供多款多模态向量化模型，能力定位如下：
-- `qwen3-vl-embedding`：默认 2560 维，支持独立/融合向量，支持多 `image` 条目输入，通过参数控制融合行为。
-- `qwen2.5-vl-embedding`：默认 1024 维，**仅支持融合向量**（固定返回单向量），不支持独立模式与多图序列。
-- `tongyi-embedding-vision-plus` / `flash`（含 2026-03-06 快照版）：快照版基于 Qwen3 底座，支持多分辨率档位、30+ 语种及融合/独立双模式。
-- `multimodal-embedding-v1`：固定 1024 维，提供基础跨模态表征能力。
-详细维度、语种、配额与成本对照请参阅 [Multimodal-Embedding API详情](../../raw/model-api-reference/multimodal-vector/multimodal-embedding-api-reference.md)。构建 [[embedding-models]] 应用时，建议全链路保持模型版本一致以确保向量空间对齐。
+根据 [Multimodal-Embedding API详情](../../raw/model-api-reference/multimodal-vector/multimodal-embedding-api-reference.md)，百炼平台提供以下多模态向量模型：
 
-## 关键参数说明
-HTTP 与 SDK 调用均需遵循以下参数规范：
-- `model`（必选）：指定调用的模型名称，需与官方列表严格匹配。
-- `input.contents`（必选）：内容数组。支持四种键值对结构：
-  - `text`：字符串。
-  - `image`：公网 URL 或 Base64 Data URI。
-  - `video`：仅支持公网 URL。
-  - `multi_images`：图片 URL/Base64 数组（部分模型支持）。
-- `parameters.dimension`：自定义输出维度。各模型可选档位不同（如 `qwen3-vl-embedding` 支持 2560~256），部分老模型固定维度，传参将被忽略。
-- `parameters.enable_fusion`（bool）：仅 `qwen3-vl-embedding` 适用。设为 `true` 时合并 `contents` 为单向量。
-- `parameters.res_level` / `max_video_frames`：仅 `2026-03-06` 快照版支持。分别控制图像分辨率档位（0-3）与视频最大采样帧数（上限 64）。
-- `parameters.instruct`：任务提示词（建议英文），可微调下游检索精度。
+| 模型 | 默认维度 | 向量类型 | 特点 |
+|------|---------|---------|------|
+| `qwen3-vl-embedding` | 2560 | 独立 / 融合 | 支持 33 种语言，通过 `enable_fusion=true` 开启融合模式 |
+| `qwen2.5-vl-embedding` | 1024 | 仅融合 | 始终返回 1 个融合向量，不支持独立向量和多图输入 |
+| `tongyi-embedding-vision-plus-2026-03-06` | 1152 | 独立 / 融合 | 基于 Qwen3 底座，支持多分辨率、30+ 语言 |
+| `tongyi-embedding-vision-flash-2026-03-06` | 768 | 独立 / 融合 | 同上，轻量版 |
+| `tongyi-embedding-vision-plus` | 1152 | 仅独立 | 支持 `multi_images`（最多 8 张） |
+| `tongyi-embedding-vision-flash` | 768 | 仅独立 | 轻量版 |
+| `multimodal-embedding-v1` | 1024 | 独立 | 固定维度，不支持 `dimension` 参数 |
+
+## 向量类型：独立向量与融合向量
+
+多模态向量模型支持两种生成方式：
+
+- **独立向量**：为 `contents` 中每个输入分别生成向量。输入 1 段文本和 1 张图片，返回 2 个向量。适用于以图搜图、以文搜图等逐项对比场景。
+- **融合向量**：将所有输入融合编码为 1 个向量，实现跨模态综合语义表征。适用于将商品图片和描述文本融合为统一表征进行检索等场景。
+
+融合向量的开启方式因模型而异：
+
+- `qwen3-vl-embedding`：设置 `enable_fusion=true`
+- `tongyi-embedding-vision-plus-2026-03-06` / `flash-2026-03-06`：将 text、image、video 放在**同一个 content 对象**中
+- `qwen2.5-vl-embedding`：默认且仅支持融合
+
+融合支持的组合包括：文本+图片、文本+视频、多图+文本、图片+视频+文本混合。
+
+## 关键参数
+
+根据 [Multimodal-Embedding API详情](../../raw/model-api-reference/multimodal-vector/multimodal-embedding-api-reference.md) 中的参数说明：
+
+| 参数 | 类型 | 说明 | 适用模型 |
+|------|------|------|---------|
+| `dimension` | integer | 指定输出向量维度，不同模型支持的值不同 | 除 `multimodal-embedding-v1`、`tongyi-embedding-vision-plus/flash` 外均支持 |
+| `enable_fusion` | bool | 是否生成融合向量，默认 `false` | 仅 `qwen3-vl-embedding` |
+| `fps` | float | 控制视频抽帧比例，范围 [0,1]，默认 1.0 | 全部 |
+| `instruct` | string | 自定义任务说明，指导模型理解查询意图（建议英文） | 全部 |
+| `res_level` | integer | 输入分辨率档位 (0/1/2/3)，默认 1 | 仅 `2026-03-06` 快照版本 |
+| `max_video_frames` | integer | 视频最大采样帧数上限，最大 64，默认 8 | 仅 `2026-03-06` 快照版本 |
 
 ## 使用方式
-### 环境准备
-1. 完成 [[api-key]] 获取并注入环境变量。
-2. 若使用编程接口，需按指引安装 [[dashscope-sdk]]。
 
-### 调用模式
-- **端点**：`POST https://dashscope.aliyuncs.com/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding`
-- **独立向量**：`contents` 数组每项仅含单一模态，返回向量数量与元素数量一致。
-- **融合向量（qwen3）**：附加 `"parameters": {"enable_fusion": true}`，返回长度为 1 的向量数组。
-- **融合向量（2026-03-06版）**：在 `contents` 的单对象内同时写入 `text`、`image`、`video` 等键，无需额外开关参数，模型自动融合编码。
-完整鉴权头、JSON 报文结构与错误码定义，请参考 [Multimodal-Embedding API详情](../../raw/model-api-reference/multimodal-vector/multimodal-embedding-api-reference.md)。
+### HTTP 调用
 
-## 限制与注意事项
-- **输入规格**：单次请求 `contents` 元素总数通常上限为 20。视频仅支持公网可访问 URL，单文件大小建议控制在 3~50 MB（依模型而定），编码格式需为 H.264/H.265。
-- **模型行为差异**：
-  > **注意**：不同模型生成融合向量的触发逻辑存在硬性隔离。`qwen2.5-vl-embedding` 强制融合且拒收 `multi_images`；`qwen3-vl-embedding` 严格依赖 `enable_fusion` 开关；2026-03-06 快照系列则依赖同对象多字段聚合。错误混用参数将导致 `400` 错误或非预期截断，接入前请严格核对目标模型的能力矩阵。
-- **计费与配额**：按千输入 Token 计费，文本与视音频单价独立核算。新用户通常享有开通后 90 天内 100 万 Token 的免费额度，超额按量计费。
-- **向量检索对接**：生成后的向量可直接导入 [[vector-database]] 或检索引擎进行近似最近邻搜索。跨模型、跨批次或跨语言生成的向量严禁混合计算相似度，必须保证查询向量与索引向量同源同参。
+请求端点：
+
+```
+POST https://dashscope.aliyuncs.com/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding
+```
+
+请求体核心结构：
+
+```json
+{
+    "model": "模型名称",
+    "input": {
+        "contents": [
+            {"text": "文本内容"},
+            {"image": "图片URL或Base64"},
+            {"video": "视频URL"}
+        ]
+    },
+    "parameters": {
+        "dimension": 1024,
+        "enable_fusion": false
+    }
+}
+```
+
+`contents` 支持四种模态类型：`text`、`image`、`video`、`multi_images`。图片支持 URL 和 Base64 Data URI 两种传入方式；视频仅支持 URL。
+
+### 前提条件
+
+调用前需获取 [[api-key]] 并配置到环境变量。通过 SDK 调用还需安装 [[dashscope-sdk]]。
+
+## 输入限制
+
+| 模型 | 文本长度 | 图片大小 | 视频大小 | 单次请求限制 |
+|------|---------|---------|---------|------------|
+| `qwen3-vl-embedding` | 32,000 Token | ≤5 MB | ≤50 MB | 总数≤20，图片≤5，视频≤1 |
+| `qwen2.5-vl-embedding` | 32,000 Token | ≤5 MB | ≤50 MB | 每种类型最多 1 次 |
+| `tongyi-embedding-vision-plus-2026-03-06` | 1,024 Token | 建议≤5 MB，最大 10 MB，最多 64 张 | ≤50 MB (H.264/H.265) | 总数≤20，图片≤64，视频≤8 |
+| `tongyi-embedding-vision-plus` | 1,024 Token | ≤3 MB，最多 8 张 | ≤10 MB | 按 Token 上限控制 |
+| `multimodal-embedding-v1` | 512 Token | ≤3 MB | ≤10 MB | 总数≤20 |
+
+## 注意事项
+
+> **注意**：`multi_images` 类型仅 `tongyi-embedding-vision-plus`、`tongyi-embedding-vision-flash` 及其 `2026-03-06` 快照版本支持，`qwen3-vl-embedding` 通过传入多个 `image` 条目实现多图输入，而 `qwen2.5-vl-embedding` 不支持多图。
+
+- 所有模型均支持 text、image、video 三种输入类型及组合。
+- `res_level` 参数对 IPC/自驾/视觉文字等分辨率敏感场景，设为 3 可提升 5%-10% 效果。
+- `instruct` 参数建议使用英文撰写，通常带来约 1%-5% 效果提升。
+- 各模型支持的图片格式差异较大：新版模型支持 JPEG/PNG/WEBP/BMP/TIFF 等 9 种格式，旧版仅支持 JPG/PNG/BMP，详见 [Multimodal-Embedding API详情](../../raw/model-api-reference/multimodal-vector/multimodal-embedding-api-reference.md)。
+
+## 相关概念
+
+- [[text-embedding]]：纯文本向量化模型
+- [[vector-search]]：基于向量的语义搜索
+- [[dashscope-sdk]]：百炼 SDK 安装与使用
 
 ## 来源文档
 
