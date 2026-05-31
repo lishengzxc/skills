@@ -1,93 +1,95 @@
 # support
 
-阿里云百炼平台提供多渠道的技术支持与服务保障，涵盖常见问题解答、计费说明、API/SDK 使用指导以及相关法律协议。本页面汇总了开发者在使用百炼平台过程中最常遇到的问题和资源入口，帮助快速定位并解决问题。
+阿里云百炼平台为开发者提供了完善的技术支持体系，涵盖常见问题解答、服务协议、计费说明及联系渠道等内容。本文汇总了平台使用过程中的核心支持信息，帮助开发者快速定位和解决问题。
+
+## 服务开通与基本使用
+
+使用**阿里云主账号**前往百炼控制台（北京或新加坡），阅读并同意协议后即可自动开通服务。开通前需完成实名认证，并确保账户余额不小于 0 元。
+
+- 目前百炼服务开通后**暂不支持关闭**。如需停止调用，可在控制台删除已创建的 API-Key。
+- 阿里云百炼是大模型服务平台，提供包括千问系列在内的多种模型，与"千问"本身是平台与模型的关系。
+- 如需实现业务数据隔离，可通过主账号为不同子账号授予不同业务空间权限。
 
 ## 计费与付费方式
 
-百炼平台采用**按分钟级出账、按月结算**的后付费模式，部分模型还支持预付费（详见[节省计划与资源包](https://help.aliyun.com/zh/model-studio/savings-plan-and-resource-package)）。开通服务要求阿里云账户余额不小于 0 元。
+根据 [常见问题](../../raw/model-user-guide/support/faq-about-alibaba-cloud-model-studio.md) 中的说明，百炼平台的计费要点如下：
 
-关键计费资源：
+| 项目 | 说明 |
+|------|------|
+| 模型调用 | 按量后付费，按分钟级出账、按月结算 |
+| 模型训练/部署 | 另有独立计费方式 |
+| 预付费 | 部分模型支持节省计划与资源包 |
+| 万相会员 | 与百炼 API 调用计费体系**完全独立**，不可互用 |
 
-| 计费项 | 参考文档 |
-|--------|----------|
-| 模型调用 | [模型调用计费](https://help.aliyun.com/zh/model-studio/model-pricing) |
-| 模型部署 | [模型部署计费](https://help.aliyun.com/zh/model-studio/model-training-and-deployment-billing) |
-| 模型训练 | [模型训练计费](https://help.aliyun.com/zh/model-studio/model-training-and-deployment-billing) |
+扣款明细可在阿里云 [费用与成本](https://usercenter2.aliyun.com/finance/expense-report/expense-detail) 控制台查看，发票通过 [发票管理](https://usercenter2.aliyun.com/invoice/list/aliyun) 页面申请。
 
-扣款明细可在[费用与成本控制台](https://usercenter2.aliyun.com/finance/expense-report/expense-detail)查看，发票在[发票管理](https://usercenter2.aliyun.com/invoice/list/aliyun)页面申请。
+## API / SDK 使用要点
 
-> **注意**：万相会员与百炼 API 的计费体系相互独立，万相会员权益不适用于百炼 API 调用。
+### SDK 安装
 
-## API/SDK 使用要点
+百炼支持 Java 和 Python 语言的 SDK，详见官方文档 [安装SDK](https://help.aliyun.com/zh/model-studio/install-sdk)。
 
-百炼平台当前支持 Java 和 Python SDK，安装方式详见 [安装SDK](https://help.aliyun.com/zh/model-studio/install-sdk)。API 调用错误码及解决方案请参见 [错误码文档](https://help.aliyun.com/zh/model-studio/error-code)。
+### 常见调用问题
 
-根据 [常见问题](../../raw/model-user-guide/support/faq-about-alibaba-cloud-model-studio.md) 中的说明，以下是开发者常遇到的 API 问题：
+- **错误码 100004（参数缺失）**：检查必须参数是否完整，以及参数格式是否正确（如 JSON key 的拼写、大小写）。
+- **错误码查询**：参见 [错误码文档](https://help.aliyun.com/zh/model-studio/error-code)。
+- **`doc_reference_type` 不生效**：该参数仅在旧版应用中有效，新版应用需在操作页面开启"展示答案来源"开关。
 
-- **Completion API 报错 100004**：通常是缺少必填参数或参数格式不正确，需检查 `AppId`、`Prompt` 等字段。
-- **Assistant API 不支持多函数串行调用**：如需调用两个本地函数，需创建两个 Assistant 分别处理。
-- **Assistant API 暂不支持 memory 配置**。
-- **`doc_reference_type` 参数**：仅在旧版应用中生效，新版应用需在操作页面开启"展示答案来源"开关。
+### Assistant API 限制
 
-## 模型选型与训练
+- 不支持在单次调用中分别调用两个本地函数（function call），需手动创建两个 Assistant API 分别处理。
+- 当前暂不支持 memory 配置功能。
 
-### 千问系列模型对比
+## 模型选择与训练
+
+### 千问系列模型概况
+
+- 支持 **14 种语言**：中文、英文、阿拉伯语、西班牙语、法语、葡萄牙语、德语、意大利语、俄语、日语、韩语、越南语、泰语、印度尼西亚语。
+- 已支持图片训练（qwen-vl-plus 模型支持训练微调）。
+- 本地训练的模型**不支持上传**到平台；平台训练完成的模型**不支持导出**。
+
+### 模型选择建议
 
 | 模型 | 特点 | 适用场景 |
 |------|------|----------|
-| [[qwen-turbo]] | 速度快、费用低 | 对响应速度和部署便捷性有较高要求 |
-| [[qwen-max]] | 顶级性能、全面知识 | 对精度和复杂任务能力有严格要求 |
+| qwen-turbo | 速度快、费用低 | 对响应速度和部署便捷性要求高 |
+| qwen-max | 性能强、知识全面 | 对精度和复杂任务处理能力要求高 |
 
-千问系列支持 **14 种语言**：中文、英文、阿拉伯语、西班牙语、法语、葡萄牙语、德语、意大利语、俄语、日语、韩语、越南语、泰语、印度尼西亚语。
+### 训练最佳实践
 
-### 模型训练注意事项
+根据 [常见问题](../../raw/model-user-guide/support/faq-about-alibaba-cloud-model-studio.md) 中模型中心部分的说明：
 
-- 已支持图片训练（[[qwen-vl-plus]] 支持训练微调）。
-- 本地训练的模型**不支持上传**，"自定义模型"仅指平台上已训练完成的模型用于二次训练。
-- 训练完成的开源模型**不支持导出**。
-- 千问基模型升级后，企业模型不一定需要重新训练，建议用效果评估工具自行判断。
+1. **数据质量优先**：答案应准确、简洁，避免冗余；同一语义用多种 [prompt](prompt.md) 表达以提升多样性。
+2. **避免灾难性遗忘**：仅用垂直领域数据做 SFT 可能导致模型遗忘通用知识。
+3. **超参数调优**：循环次数无固定规律，需根据具体任务实验确定。数据量少时可适当增加循环次数，数据量大时需警惕过拟合。
+4. **评估方式**：不应仅通过 loss 判断过拟合，最终效果以人工评估为准。
 
-### 训练数据最佳实践
+## 模型幻觉处理
 
-据 [常见问题](../../raw/model-user-guide/support/faq-about-alibaba-cloud-model-studio.md) 中的总结，高质量 SFT 数据应满足：
-
-1. **任务定义清晰**：避免同一 [[prompt|prompt]] 对应模棱两可的答案。
-2. **数据质量高**：答案准确、简洁，避免冗余。
-3. **数据多样性**：同一语义用多种 [[prompt|prompt]] 表达，避免模型只学会单一模式。
-
-超参数（如循环次数）无固定规律，需通过实验确定。评估模型效果应以**人工评估**为准，不应仅依赖 loss 值判断过拟合。
-
-## 降低模型幻觉
-
-模型幻觉指 LLM 生成看似合理但无事实依据的内容。可通过以下方式缓解：
+降低模型幻觉的推荐方法（按实施难度排序）：
 
 1. **选择更强模型**：Max > Plus > Turbo。
-2. **[[prompt-engineering]]**：添加约束指令，如"信息不足请说'我不知道'"。
-3. **[[rag]]（检索增强生成）**：限制模型在检索到的知识范围内回答。
-4. **插件 / [[mcp]]**：将数值计算等任务委托给外部工具。
-5. **参数调优**：降低 `temperature`、`top_k`、`top_p` 等随机性参数。
-6. **后处理验证**：用 AI 二次校验回复内容（会增加成本和延迟）。
+2. **提示词工程**：添加约束指令，如"仅基于提供的文档回答"。
+3. **RAG（检索增强生成）**：让模型回复基于检索到的知识。
+4. **插件 / MCP**：将数值计算等任务交给外部工具完成。
+5. **调低随机性参数**：降低 `temperature`、`top_k`、`top_p`，降低 `max_tokens` 可防止模型在关键信息后继续捏造。
+6. **后处理验证**：用 AI 校验回答的正确性（会增加成本和延迟）。
 
-## 模型限流
+## 限流与性能
 
-生成速度不固定，受服务负载和请求并发影响。触发限流后的等待时间取决于具体 RPS/RPM 限额。例如 120 RPM 限额下，0.2 秒内连发 2 次后第 3 次将被限流，需等待约 0.8 秒。
+- 模型生成速度**不固定**，受服务整体负载和请求并发影响。
+- 限流触发后的等待时间取决于具体限流值（RPS/RPM）。例如 120 RPM 限流下，0.2 秒内提交 2 次请求后，第 3 次需等待约 0.8 秒。
 
-## 数据安全与隐私
+## 数据安全与合规
 
 - 阿里云**不会**将用户数据用于模型训练。
-- 传输数据经 AES-256 加密。
-- 根据法律法规要求，百炼会存储模型与应用调用时产生的数据。
-- 可通过主账号为不同子账号分配不同 [[业务空间]] 权限实现数据隔离。
-- 控制台最多展示 **100 条历史对话记录**，不设时间限制；未登录状态和推理报错的对话不会保存。
-
-## 服务开通与关闭
-
-- **开通**：使用阿里云主账号访问百炼控制台，阅读并同意协议后自动开通（需已完成实名认证）。
-- **关闭**：开通后暂不支持关闭，但可通过删除 API-Key 避免后续调用和计费。
+- 传输数据使用 AES-256 加密。
+- 根据法律法规要求，百炼将存储模型与应用调用时产生的数据，具体条款见服务协议。
+- 控制台最多展示 100 条历史对话记录，不设时间限制；未登录体验及推理报错的对话不保存。
 
 ## 相关协议
 
-根据 [相关协议](../../raw/model-user-guide/support/related-agreements.md)，使用百炼平台需遵守以下协议：
+根据 [相关协议](../../raw/model-user-guide/support/related-agreements.md) 页面，使用百炼平台前应了解以下协议：
 
 - [阿里云百炼服务协议](https://terms.alicdn.com/legal-agreement/terms/common_platform_service/20230728213935489/20230728213935489.html)
 - [阿里云百炼模型推理服务等级协议（SLA）](https://terms.alicdn.com/legal-agreement/terms/b_end_product_protocol/20250923215800868/20250923215800868.html)
@@ -99,8 +101,8 @@
 
 | 场景 | 渠道 |
 |------|------|
-| 业务合作 / 售前咨询 | 热线 4008013260 或 [官网售前咨询](https://smartservice.console.aliyun.com/service/pre-sales-chat) |
-| 产品使用问题 / 售后 | [官网售后服务](https://smartservice.console.aliyun.com/service/robot-chat) |
+| 业务合作 | 服务热线 4008013260 或 [官网-售前咨询](https://smartservice.console.aliyun.com/service/pre-sales-chat) |
+| 产品使用问题 | [官网-售后服务](https://smartservice.console.aliyun.com/service/robot-chat) |
 | 合作协议申请 | 提交 [阿里云工单](https://smartservice.console.aliyun.com/service/create-ticket) |
 
 ## 来源文档

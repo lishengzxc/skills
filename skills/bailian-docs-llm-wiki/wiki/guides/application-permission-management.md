@@ -1,108 +1,103 @@
 # application permission management
 
-阿里云百炼平台提供基于控制台页面级和模型级的多维度权限控制，支持多地域、多用户的复杂组织架构管理。权限管理的最小管理单元是**业务空间**，通过角色划分（超级管理员、业务空间管理员、普通用户）实现精细化的资源访问控制。
+阿里云百炼平台提供基于控制台页面级和模型级的多维度权限控制体系，通过业务空间（Workspace）作为最小管理单元，实现精细化的用户、模型和 API Key 权限管理。该体系支持多地域、多用户的复杂组织架构，满足从开发到生产环境的权限隔离需求。
 
-## 身份与角色体系
+## 角色与权限模型
 
-百炼的权限管理基于三种角色，详见 [权限管理](../../raw/application-user-guide/application-permission-management/application-permission-management-overview.md) 原文：
+百炼的权限管理基于三种角色，详见 [权限管理](../../raw/application-user-guide/application-permission-management/application-permission-management-overview.md)：
 
-| 角色 | 说明 |
-|------|------|
-| **超级管理员** | 阿里云主账号或拥有 `AliyunBailianFullAccess` 策略的 RAM 用户，可跨空间统一管理权限 |
-| **业务空间管理员** | 拥有特定业务空间"权限管理"页面访问权限的 RAM 用户 |
-| **普通用户** | 根据分配的权限使用资源，无管理能力 |
-
-## 权限矩阵
-
-| 业务空间权限 | 超级管理员 | 业务空间管理员 | 普通用户 |
-|---|---|---|---|
-| 模型调用 & 限流配置 | ✅ | ❌ | ❌ |
-| 模型调优/部署配置 | ✅ | ❌ | ❌ |
+| 权限项 | 超级管理员 | 业务空间管理员 | 普通用户 |
+|--------|-----------|--------------|---------|
+| 模型调用 & 限流管理 | ✅ | ❌ | ❌ |
+| 模型调优 / 部署管理 | ✅ | ❌ | ❌ |
 | 用户管理 | ✅ | ✅ | ❌ |
 | 用户可用页面管理 | ✅ | ✅ | ❌ |
 | API Key 管理 | ✅ | ✅ | ❌ |
 | 访问被授权的资源 | ✅ | ✅ | ✅ |
-| OpenAPI 接口权限 | 需主账号在 RAM 控制台单独配置 | — | — |
+| OpenAPI 接口权限 | 需主账号在 RAM 控制台单独授权 | 需主账号在 RAM 控制台单独授权 | 需主账号在 RAM 控制台单独授权 |
 
-## 业务空间与模型管理
+### 超级管理员
 
-业务空间按地域划分，**单个业务空间不能跨地域存在**。根据 [权限管理](../../raw/application-user-guide/application-permission-management/application-permission-management-overview.md) 文档，非默认业务空间可管理：
+包含两类账号：
+- **阿里云主账号**：天然拥有最高权限。
+- **拥有 `AliyunBailianFullAccess` 策略的 RAM 用户**：可跨地域、跨空间管理所有权限（OpenAPI 接口权限除外）。
 
-- **模型调用限制**：控制模型是否可在该空间调用，设置请求数限流和 Token 限流
-- **模型训练限制**：控制模型是否可在该空间进行调优和部署
-- **模型部署限制**：控制模型是否可在该空间直接部署
+### 业务空间管理员
 
-> **注意**：默认业务空间无法设置上述限制，所有模型均可调用且无法限流。
+拥有某个业务空间**权限管理**页面访问权的 RAM 用户，管理员权限自动包含该空间下所有页面的访问权限。
+
+## 业务空间权限管理
+
+业务空间按地理区域划分，**单个业务空间不能跨地域存在**。根据 [权限管理](../../raw/application-user-guide/application-permission-management/application-permission-management-overview.md) 文档，业务空间支持以下权限维度：
+
+- **模型调用控制**：管理模型是否可在该空间调用（控制台及 API），并设置请求数限流和 Token 限流。
+- **模型训练控制**：管理模型是否可进行调优及调优后部署。
+- **模型部署控制**：管理模型是否可直接部署。
+- **用户控制台权限**：管理 RAM 用户对该空间控制台功能的访问权限。
+
+> **注意**：默认业务空间无法设置模型调用、调优和部署的限制，所有支持的模型均可使用且无法限流。
 
 ## API Key 权限
 
-API Key 的关键特性：
+- 单个 API Key 只能归属**一个地域**内的**一个业务空间**和**一个用户**，不可转移。
+- API Key 的可调用功能和限流与归属业务空间一致，**不受用户控制台权限管理影响**。
+- 无需为不同模型类型（文生文、文生图、语音合成等）创建不同的 API Key。
 
-- 单个 API Key 只能归属**一个地域**内的**一个业务空间**和**一个用户**，不可转移
-- 可调用的功能和模型限流与归属业务空间一致，不受用户控制台权限影响
-- 无需为不同模型类型（文生文、文生图、语音合成等）创建不同 API Key
-- 自 2026年3月25日起，华北2（北京）地域新建的 API Key 均归属主账号
+API Key 状态变更规则：
 
-API Key 状态变化规则：
-- 主动删除：失效且不可恢复
-- 用户移出业务空间：失效（重新加入后恢复）
-- RAM 控制台删除账号/角色：失效且不可恢复
+| 操作 | 主账号 API Key | RAM 账号 API Key |
+|------|--------------|-----------------|
+| 主动删除 | 失效，不可恢复 | 失效，不可恢复 |
+| 账号移出业务空间 | — | 失效（重新加入后恢复） |
+| RAM 控制台删除账号 | — | 失效，不可恢复 |
+
+> **注意**：自 2026年3月25日起，华北2（北京）地域所有新创建的 API Key 均归属主账号。
 
 ## OpenAPI 接口权限
 
-RAM 用户默认无权调用百炼**应用**类 OpenAPI（[[knowledge-base]]、Prompt工程、长期记忆等）。需由主账号在 RAM 控制台添加以下权限之一：
+RAM 用户默认**无权**调用百炼应用的数据、知识库、Prompt 工程及长期记忆等功能的 OpenAPI。需由阿里云主账号在 RAM 控制台授予以下权限之一：
 
-- `AliyunBailianDataFullAccess`：可调用应用 API 目录下所有 API
-- `AliyunBailianDataReadOnlyAccess`：仅可调用只读类 API
+- **`AliyunBailianDataFullAccess`**：可调用百炼应用 API 目录下的所有 API。
+- **`AliyunBailianDataReadOnlyAccess`**：仅可调用只读类 API。
 
-## 常用配置步骤
+## 常用配置指南
 
 ### 设置超级管理员
 
-需主账号或具备 `AliyunRAMFullAccess` 的 RAM 用户操作：
-
-1. 在 RAM 控制台为 RAM 用户添加 `AliyunBailianFullAccess` 和 `AliyunBSSOrderAccess` 权限
-2. 完成后可通过全局管理菜单管理所有地域和空间
+1. 在 RAM 控制台为 RAM 用户添加 `AliyunBailianFullAccess` 和 `AliyunBSSOrderAccess` 权限。
+2. 通过全局管理菜单为任意 RAM 用户授权任意地域、任意空间的权限。
 
 ### 设置模型调用权限
 
-1. 非默认空间需超级管理员开通模型调用权限
-2. 控制台调用需添加：**模型体验-操作**、**批量推理-操作**、**模型观测-操作**
-3. API 调用需在对应空间创建或分配 API Key
+1. 非默认业务空间需由超级管理员开通特定模型的调用权限。
+2. **控制台调用**：为 RAM 用户添加「模型体验-操作」、「批量推理-操作」、「模型观测-操作」页面权限。
+3. **API 调用**：在对应业务空间为 RAM 用户创建或分配 API Key。
 
 ### 设置模型调优权限
 
-控制台调优需添加：模型体验、模型调优、我的模型、模型部署、模型评测、数据管理、模型观测的操作权限。API 调优仅需 API Key。
+需为 RAM 用户添加以下页面权限：模型体验-操作、模型调优-操作、我的模型-操作、模型部署-操作、模型评测-操作、数据管理-操作、模型观测-操作。
 
 ## 生产环境最佳实践
 
-根据 [权限管理](../../raw/application-user-guide/application-permission-management/application-permission-management-overview.md) 建议的空间规划策略：
+参考 [权限管理](../../raw/application-user-guide/application-permission-management/application-permission-management-overview.md) 中推荐的策略：
 
-**按环境划分（推荐）：**
-- `project-dev-workspace` / `project-test-workspace` / `project-prod-workspace`
+### 空间规划
 
-**限流策略示例**（账号总配额 1000 QPM）：
-- 生产：600 QPM (60%)
-- 测试：200 QPM (20%)
-- 开发：100 QPM (10%)
-- 预留缓冲：100 QPM (10%)
+- **按环境划分（推荐）**：为开发、测试、生产环境创建独立空间，如 `project-dev-workspace`、`project-prod-workspace`。
+- **按业务线划分**：为不同部门创建独立空间，便于权限和成本管理。
+
+### 限流策略
+
+将主账号总配额按比例分配给各业务空间，建议预留 10% 作为缓冲。例如总配额 1000 QPM：生产 600 QPM（60%）、测试 200 QPM（20%）、开发 100 QPM（10%）、缓冲 100 QPM（10%）。
 
 ## 账单与预付费权限
 
-RAM 用户默认无法查看账单或购买预付费产品，需额外授权：
+RAM 用户默认无权查看账单或购买预付费产品，需在 RAM 控制台添加：
 
-- 查看账单：添加 `AliyunBSSReadOnlyAccess`
-- 购买预付费产品：添加 `AliyunBSSOrderAccess`
+- **`AliyunBSSReadOnlyAccess`**：查看所有阿里云产品账单。
+- **`AliyunBSSOrderAccess`**：购买所有阿里云预付费产品。
 
-> **注意**：这些权限作用于阿里云**所有产品**，并非百炼专属，请谨慎授权。
-
-## 相关概念
-
-- [[api-key-management]]
-- [[ram-user]]
-- [[workspace]]
-- [[model-fine-tuning]]
-- [[batch-inference]]
+> **注意**：以上两项权限作用于阿里云所有产品（不仅限百炼），请谨慎授权。
 
 ## 来源文档
 

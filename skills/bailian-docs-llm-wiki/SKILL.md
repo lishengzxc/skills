@@ -147,20 +147,20 @@ description: >-
 | **按家族筛选**：按 primaryCapability / providers / itemCount / maxContextWindow 找家族 | `models/families.jsonl`（一行一家族，含 items[] 摘要） |
 | 模型家族总览 / 按能力分桶浏览         | `models/index.md`                                        |
 | 主题页 / API 文档（按功能领域查找）    | `wiki/index.md`（完整索引入口）                          |
-| 函数调用（工具调用） | `wiki/concepts/function-calling.md` |
-| 检索增强生成（RAG） | `wiki/concepts/rag.md` |
-| Token 计量与计费 | `wiki/concepts/token.md` |
-| 流式输出 | `wiki/concepts/streaming.md` |
+| 函数调用（Function Calling） | `wiki/concepts/function-calling.md` |
 | OpenAI 兼容接口 | `wiki/concepts/openai-compatible-api.md` |
-| API Key 管理与安全 | `wiki/concepts/api-key.md` |
-| 异步任务调用 | `wiki/concepts/async-task.md` |
-| 多轮对话与上下文管理 | `wiki/concepts/multi-turn-conversation.md` |
-| 语音合成、语音识别与语音翻译对比 | `wiki/comparisons/speech-synthesis-vs-recognition-vs-translation.md` |
-| 图像生成、视频生成与3D生成对比 | `wiki/comparisons/image-vs-video-vs-3d-generation.md` |
-| 模型评估与应用评估对比 | `wiki/comparisons/model-vs-application-evaluation.md` |
-| 模型监控与应用监控对比 | `wiki/comparisons/model-vs-application-monitoring.md` |
+| 流式输出 | `wiki/concepts/streaming.md` |
+| 检索增强生成（RAG） | `wiki/concepts/rag.md` |
+| Token 计量与上下文窗口 | `wiki/concepts/token.md` |
+| 异步任务模式 | `wiki/concepts/async-task-pattern.md` |
+| 多轮对话管理 | `wiki/concepts/multi-turn-conversation.md` |
+| API Key 认证与安全 | `wiki/concepts/api-key-authentication.md` |
+| 语音合成、语音识别与语音翻译对比 | `wiki/comparisons/speech-synth-vs-recognition-vs-translation.md` |
 | 文本Embedding与多模态向量对比 | `wiki/comparisons/text-embedding-vs-multimodal-vector.md` |
-| 模型微调与模型训练对比 | `wiki/comparisons/fine-tuning-vs-model-training.md` |
+| 模型评估与应用评估对比 | `wiki/comparisons/model-evaluation-vs-application-evaluation.md` |
+| 模型监控与应用监控对比 | `wiki/comparisons/model-monitoring-vs-application-monitoring.md` |
+| 模型微调、模型训练与模型部署对比 | `wiki/comparisons/fine-tuning-vs-model-training-vs-model-deployment.md` |
+| 图像生成、视频生成与3D生成对比 | `wiki/comparisons/image-vs-video-vs-3d-generation.md` |
 
 > 实际文件名以 `wiki/index.md` 为准；上表若有出入应回到索引页查找。
 

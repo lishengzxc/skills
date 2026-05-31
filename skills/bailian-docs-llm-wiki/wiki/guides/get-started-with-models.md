@@ -1,59 +1,66 @@
 # get started with models
 
-阿里云百炼是一站式大模型开发与应用平台，提供兼容 OpenAI 接口规范的 API，开发者只需几行代码即可调用千问（Qwen）全系列模型及 DeepSeek、Kimi、GLM 等第三方模型。本文汇总了模型调用前需要了解的核心内容，包括支持的模型、接入方式、地域选择和限流规则。
+阿里云百炼提供兼容 OpenAI 的大模型调用服务，集成千问（Qwen）全系列及 DeepSeek、Kimi、GLM 等第三方模型。开发者只需获取 API Key、选择模型和地域，即可通过几行代码完成模型调用。本文汇总模型接入的核心信息，帮助您快速上手。
 
 ## 支持的模型与能力
 
-百炼提供开箱即用的模型服务，无需自行部署或运维。根据 [选择模型](../../raw/model-user-guide/get-started-with-models/models.md)，当前覆盖以下模态：
+百炼覆盖多种模态和任务类型，详见 [选择模型](../../raw/model-user-guide/get-started-with-models/models.md)：
 
 | 能力类别 | 代表模型 | 说明 |
-|---|---|---|
-| 文本生成 | `qwen3.7-max`、`qwen3.6-plus`、`qwen3.6-flash` | 千问旗舰系列，从效果最优到高性价比依次排列 |
-| 文本生成（三方） | `deepseek-v4-pro`、`kimi-k2.6`、`glm-5.1` 等 | API 格式与千问一致，DeepSeek 仅支持北京地域 |
-| 视觉理解 | `qwen3.6-plus`、`qwen3.5-omni-plus` | 分析图片/视频，返回文本或结构化结果 |
-| 图像/视频生成 | `wan2.7-image-pro`、`happyhorse-1.0-t2v` | 文生图、图生视频、视频编辑等 |
-| 语音合成与识别 | `cosyvoice-v3.5-plus`、`fun-asr-realtime` | TTS、ASR 及端到端语音对话 |
-| 向量与重排序 | `text-embedding-v4`、`qwen3-rerank` | 文本向量化及检索精度提升 |
-| 全模态 | `qwen3.5-omni-plus-realtime` | 融合文本、图像、音频、视频的理解与生成 |
+|---------|---------|------|
+| **文本生成** | qwen3.7-max、qwen3.6-plus、qwen3.6-flash | Max 效果最强，Plus 均衡推荐，Flash 低延迟高性价比 |
+| **文本生成（第三方）** | deepseek-v4-pro、kimi-k2.6、glm-5.1 | API 格式与千问一致，DeepSeek 仅支持北京地域 |
+| **视觉理解** | qwen3.6-plus、qwen3.5-omni-plus | 分析图片/视频内容，返回文本或结构化结果 |
+| **图像/视频生成** | wan2.7-image-pro、happyhorse-1.0-t2v | 文生图、图生视频、视频编辑等 |
+| **语音识别与合成** | cosyvoice-v3.5-plus、fun-asr-realtime | TTS、ASR、端到端语音对话 |
+| **向量与重排序** | text-embedding-v4、qwen3-rerank | 文本/图文向量化，检索增强 |
 
-千问旗舰模型的定位：
-- **Max**：效果最强，适合复杂多步骤任务
-- **Plus**：效果、速度、成本均衡，多数场景推荐
-- **Flash**：低延迟高性价比，适合简单任务快速响应
+千问旗舰模型选型建议：
+- **qwen3.7-max**：推理能力最强，适合复杂多步骤任务
+- **qwen3.6-plus**：效果、速度和成本均衡，多数场景推荐
+- **qwen3.6-flash**：高性价比低延迟，适合简单任务快速响应
 
-完整模型列表请前往 [[models]] 或[模型广场](https://bailian.console.aliyun.com/cn-beijing?tab=model#/model-market/all)查看。
-
-## 快速开始：发起第一个 API 请求
-
-详细步骤参见 [首次调用千问API](../../raw/model-user-guide/get-started-with-models/first-api-call-to-qwen.md)，核心流程如下：
+## 接入准备
 
 ### 1. 获取 API Key
 
-1. 使用阿里云主账号前往[百炼控制台](https://bailian.console.aliyun.com/?tab=model#/model-market)开通服务
-2. 进入 [API Key 页面](https://bailian.console.aliyun.com/?tab=model#/api-key) 创建密钥
+1. 注册阿里云账号并完成实名认证
+2. 前往 [百炼控制台](https://bailian.console.aliyun.com/?tab=model#/model-market) 开通服务
+3. 在 [API Key 页面](https://bailian.console.aliyun.com/?tab=model#/api-key) 创建密钥
 
 ### 2. 配置环境变量
 
-将 API Key 设置为环境变量 `DASHSCOPE_API_KEY`，避免在代码中硬编码：
+建议将 API Key 存入环境变量 `DASHSCOPE_API_KEY`，避免硬编码泄露风险。完整的各平台（Linux/macOS/Windows）配置步骤请参见 [首次调用千问API](../../raw/model-user-guide/get-started-with-models/first-api-call-to-qwen.md)。
 
 ```bash
-# Linux/macOS
-export DASHSCOPE_API_KEY="YOUR_DASHSCOPE_API_KEY"
-
-# Windows CMD
-set DASHSCOPE_API_KEY=YOUR_DASHSCOPE_API_KEY
-
-# Windows PowerShell
-$env:DASHSCOPE_API_KEY = "YOUR_DASHSCOPE_API_KEY"
+# Linux / macOS 永久生效
+echo 'export DASHSCOPE_API_KEY="sk-xxx"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-永久生效请写入 `~/.bashrc`（Linux）、`~/.zshrc`（macOS Zsh）或通过 `setx` / 系统属性设置（Windows）。
+```cmd
+# Windows CMD 永久生效
+setx DASHSCOPE_API_KEY "sk-xxx"
+```
 
-### 3. 调用模型
+### 3. 选择地域
 
-百炼兼容 OpenAI 接口，只需调整 `api_key`、`base_url` 和 `model` 即可迁移现有代码。
+每个地域有独立的 Base URL、API Key 和模型列表，**不可跨地域混用**。详见 [选择地域和服务部署范围](../../raw/model-user-guide/get-started-with-models/regions.md)。
 
-**Python（OpenAI SDK）**
+| 地域 | Base URL（OpenAI 兼容） | 典型场景 |
+|------|------------------------|---------|
+| 华北2（北京） | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 数据不出中国内地 |
+| 新加坡 | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | 数据不经过中国内地 |
+| 美国（弗吉尼亚） | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` | 全球推理或限定美国境内 |
+| 德国（法兰克福） | `https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/compatible-mode/v1` | 全球推理或限定欧盟境内 |
+
+> **注意**：弗吉尼亚地域要限定美国境内推理，需使用 `-us` 后缀模型名（如 `qwen-plus-us`）；法兰克福需先创建业务空间获取 WorkspaceId。
+
+## 调用方式
+
+百炼兼容 OpenAI 接口规范，支持 OpenAI SDK、DashScope SDK 和 curl 三种方式。以下为 OpenAI SDK 示例：
+
+### Python
 
 ```python
 import os
@@ -64,121 +71,88 @@ client = OpenAI(
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 completion = client.chat.completions.create(
-    model="qwen-plus",
+    model="qwen3.6-plus",
     messages=[
-        {'role': 'system', 'content': 'You are a helpful assistant.'},
-        {'role': 'user', 'content': '你是谁？'}
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "你是谁？"}
     ]
 )
 print(completion.choices[0].message.content)
 ```
 
-**curl**
+### Node.js
+
+```javascript
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+    apiKey: process.env.DASHSCOPE_API_KEY,
+    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+});
+
+const completion = await openai.chat.completions.create({
+    model: "qwen3.6-plus",
+    messages: [{ role: "user", content: "你是谁？" }],
+});
+console.log(completion.choices[0].message.content);
+```
+
+### curl
 
 ```bash
 curl -X POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions \
   -H "Authorization: Bearer $DASHSCOPE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "qwen-plus",
+    "model": "qwen3.6-plus",
     "messages": [{"role": "user", "content": "你是谁？"}]
   }'
 ```
 
-除 OpenAI SDK 外，也支持 DashScope SDK 和 Anthropic 兼容接口。安装方式：
+> **注意**：文档 1（平台概述）和文档 2（首次调用）中的示例代码使用了不同的默认模型名称（分别为 `qwen3.6-plus` 和 `qwen-plus`），两者均可用。`qwen3.6-plus` 为更新版本，建议优先使用。
 
-```bash
-pip install -U openai      # OpenAI Python SDK
-pip install -U dashscope   # DashScope Python SDK
-```
+## 限流与配额
 
-> **注意**：文档 1 的示例代码使用模型名 `qwen3.6-plus`，文档 2 使用 `qwen-plus`。两者均为有效模型，`qwen-plus` 会自动指向当前稳定版本，带版本号的名称（如 `qwen3.6-plus`）则指向特定版本。建议根据是否需要锁定版本来选择。
+百炼按**主账号维度**对模型调用进行限流，账号下所有 RAM 子账号、业务空间和 API Key 的调用量合并计算。不同模型的限流额度相互独立。详见 [限流](../../raw/model-user-guide/get-started-with-models/rate-limit.md)。
 
-## 地域与服务部署范围
+### 典型限流额度（中国内地/北京）
 
-根据 [选择地域和服务部署范围](../../raw/model-user-guide/get-started-with-models/regions.md)，调用前需确定两个维度：
+| 模型 | RPM（每分钟请求数） | TPM（每分钟 Token 数） |
+|------|------|------|
+| qwen3.7-max | 30,000 | 5,000,000 |
+| qwen3.6-plus | 30,000 | 5,000,000 |
+| qwen3.6-flash | 30,000 | 10,000,000 |
 
-- **地域**：决定接入点（Base URL）和数据存储位置，就近选择可降低延迟
-- **服务部署范围**：决定推理执行位置，有数据合规需求时选择特定地理边界
+### 常见限流错误
 
-### 各地域 Base URL（OpenAI 兼容）
+| 错误信息 | 原因 | 建议 |
+|---------|------|------|
+| `Requests rate limit exceeded` | 超出 RPM | 降低调用频率 |
+| `Allocated quota exceeded` | 超出 TPM | 缩短输入或限制输出长度 |
+| `Request rate increased too quickly` | 瞬时请求激增 | 采用匀速调度或指数退避 |
 
-| 地域 | Base URL |
-|---|---|
-| 华北2（北京） | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| 新加坡 | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` |
-| 美国（弗吉尼亚） | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` |
-| 德国（法兰克福） | `https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/compatible-mode/v1` |
+### 缓解限流的策略
 
-**关键约束**：
-- 不同地域的 **API Key 不通用**，Base URL 也不能跨地域混用
-- 支持的模型、功能和价格因地域而异
-- 法兰克福需先创建业务空间（Workspace）并获取 WorkspaceId
-- 弗吉尼亚使用 `-us` 后缀模型名（如 `qwen-plus-us`）可限定美国境内推理
+1. **优先选用稳定版模型**（如 `qwen-plus`），限流额度通常高于带日期的快照版本
+2. **添加备选模型**：主模型触发限流时自动切换到备用模型
+3. **使用批量推理**（Batch API）：无实时性要求时不受实时限流约束
+4. **提升临时额度**：在控制台 [限流提额](https://bailian.console.aliyun.com/?tab=model#/efm/temp_limit_raise) 页面申请，提交后立即生效，有效期 30 天
 
-### 地域功能差异
+## 各地域功能差异
 
 | 功能 | 北京 | 新加坡 | 弗吉尼亚 | 法兰克福 |
-|---|---|---|---|---|
+|------|:----:|:------:|:--------:|:--------:|
+| 实时推理 | ✅ | ✅ | ✅ | ✅ |
 | 批量推理 | ✅ | ✅ | ❌ | ❌ |
 | 模型调优 | ✅ | ❌ | ❌ | ❌ |
 | 模型告警 | ✅ | ✅ | ❌ | ❌ |
 
-## 限流规则
-
-根据 [限流](../../raw/model-user-guide/get-started-with-models/rate-limit.md)，百炼按**主账号维度**对模型调用设置限流，所有子账号、业务空间和 API Key 的调用量合并计算。
-
-### 限流指标
-
-- **RPM**（Requests Per Minute）：每分钟请求数
-- **TPM**（Tokens Per Minute）：每分钟 Token 消耗（含输入和输出）
-- 实际可能按秒级 RPS/TPS（RPM/60、TPM/60）执行，短时间请求爆发也可能触发限流
-
-### 典型限流额度（中国内地 / 北京）
-
-| 模型 | RPM | TPM |
-|---|---|---|
-| `qwen3.7-max` | 30,000 | 5,000,000 |
-| `qwen3.6-plus` | 30,000 | 5,000,000 |
-| `qwen3.6-flash` | 30,000 | 10,000,000 |
-| `qwen-plus`（稳定版） | 30,000 | 5,000,000 |
-
-带日期后缀的快照版本限流通常更低（如 RPM 60~600），优先使用稳定版可获得更宽松的额度。
-
-### 避免限流的策略
-
-1. **优先选用稳定版模型**（如 `qwen-plus` 而非 `qwen-plus-2025-07-28`）
-2. **平滑请求速率**：采用匀速调度、指数退避，避免瞬时高峰
-3. **添加备选模型**：主模型触发限流后自动切换到备用模型
-4. **使用[[batch-inference]]**：无实时要求时，批量推理不受实时限流约束
-5. **提升临时额度**：在控制台 [限流提额](https://bailian.console.aliyun.com/?tab=model#/efm/temp_limit_raise) 页面申请，提交后立即生效，有效期 30 天
-
-### 常见限流错误
-
-| 错误信息 | 含义 | 处理方式 |
-|---|---|---|
-| `Requests rate limit exceeded` | RPM 超限 | 降低调用频率 |
-| `Allocated quota exceeded` | TPM 超限 | 缩短输入或限制输出长度 |
-| `Request rate increased too quickly` | 请求频率激增触发保护 | 平滑请求速率 |
-
-超限请求被拒绝后通常在**一分钟内**自动恢复。
-
 ## 计费概要
 
-- 开通百炼免费，调用模型按量计费（按分钟出账）
-- 新用户可获得北京地域的免费额度，用完后自动转为按量付费
-- 可开启「免费额度用完即停」功能避免意外扣费
-- 详情参见 [[billing-for-model-studio]]
-
-## 相关概念
-
-- [[models]] — 完整模型列表与能力说明
-- [[regions]] — 地域与数据合规详情
-- [[rate-limit]] — 各模型详细限流额度
-- [[api-reference]] — API 参考文档
-- [[error-code]] — 错误码与排查指南
-- [[model-deployment-introduction]] — 模型部署（专享推理服务）
-- [[model-training-overview]] — 模型调优（SFT/CPT/DPO）
+- 开通百炼**不收费**，调用模型时按量付费（按分钟出账）
+- 新用户可获得北京地域专属免费额度，用完后自动转为按量付费
+- 可开启「免费额度用完即停」避免意外扣费
+- 删除所有 API Key 可从源头阻断调用，防止产生费用
 
 ## 来源文档
 

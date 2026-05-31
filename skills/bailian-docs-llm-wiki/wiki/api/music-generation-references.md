@@ -1,55 +1,50 @@
 # music generation references
 
-百炼平台提供音乐生成能力，当前支持 Fun-Music 模型，可根据歌词或提示词自动创作并生成完整歌曲音频。该功能支持流式与非流式两种输出模式，适用于背景音乐生成、AI 作曲等场景。
+百炼平台提供音乐生成能力，当前支持 Fun-Music 模型，可通过文本提示词或歌词输入自动生成歌曲。本文汇总音乐生成相关 API 的模型信息、核心参数、调用方式及使用限制，供开发者快速查阅。
 
 ## 支持的模型
 
-| 模型名称 | 模型 ID | 状态 | 部署地域 |
+| 模型名称 | 模型标识 | 状态 | 部署区域 |
 |---------|---------|------|---------|
-| Fun-Music | `fun-music-v1` | 邀测中 | 中国内地（北京） |
+| Fun-Music | `fun-music-v1` | 邀测（需在模型广场申请开通） | 中国内地（北京地域） |
 
-> **注意**：根据 [音乐生成Fun-Music API参考](../../raw/model-api-reference/music-generation-references/fun-music-api.md)，该模型目前处于邀测阶段，需在模型广场申请开通后方可使用。
+根据 [音乐生成Fun-Music API参考](../../raw/model-api-reference/music-generation-references/fun-music-api.md)，该模型支持两种输出模式：**非[流式输出](../concepts/streaming.md)**和**[流式输出](../concepts/streaming.md)**（基于 SSE）。
 
-## 服务端点
+## 服务端点与认证
 
-```
-POST https://dashscope.aliyuncs.com/api/v1/services/audio/music/generation
-```
+- **端点**：`POST https://dashscope.aliyuncs.com/api/v1/services/audio/music/generation`
+- **协议**：HTTPS
+- **认证**：请求头 `Authorization: Bearer {api-key}`
+- **[流式输出](../concepts/streaming.md)**：设置请求头 `X-DashScope-SSE: enable`
 
-通信协议：HTTPS，[[streaming|流式输出]]支持 SSE（Server-Sent Events）。
+使用前需先获取 API Key。
 
 ## 关键参数
-
-### 请求头
-
-| 参数 | 必填 | 说明 |
-|------|------|------|
-| `Authorization` | 是 | `Bearer {api-key}`，参见 [[get-api-key]] |
-| `Content-Type` | 是 | `application/json` |
-| `X-DashScope-SSE` | 否 | 设为 `enable` 启用[[streaming|流式输出]] |
 
 ### 输入参数（input 对象）
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `lyrics` | string | 条件必选 | 歌词内容，与 `[[prompt|prompt]]` 二选一 |
-| `[[prompt|prompt]]` | string | 条件必选 | 提示词，模型据此自动创作歌词并生成歌曲 |
-| `gender` | string | 否 | 演唱声音性别：`male` / `female`（默认） |
-| `format` | string | 否 | 音频格式：`mp3`（默认）/ `wav` |
-| `enable_aigc_watermark` | boolean | 否 | AIGC 水印开关，默认 `false` |
-
-如 [音乐生成Fun-Music API参考](../../raw/model-api-reference/music-generation-references/fun-music-api.md) 所述，当同时传入 `lyrics` 和 `[[prompt|prompt]]` 时，仅 `lyrics` 生效，`prompt` 将被忽略。
+| `lyrics` | string | 条件必选 | 歌词内容，与 `prompt` 二选一。同时传入时仅 `lyrics` 生效 |
+| `prompt` | string | 条件必选 | 提示词，模型据此自动创作歌词并生成歌曲，与 `lyrics` 二选一 |
+| `gender` | string | 否 | 演唱声音性别，可选 `male` / `female`，默认 `female` |
+| `format` | string | 否 | 音频编码格式，可选 `mp3`（默认）/ `wav` |
+| `enable_aigc_watermark` | boolean | 否 | AIGC 水印开关，默认 `false`。开启后在音频末尾追加摩尔斯电码信号 |
 
 ### 字符限制
+
+如 [音乐生成Fun-Music API参考](../../raw/model-api-reference/music-generation-references/fun-music-api.md) 所述，不同模式下的输入长度限制有所差异：
 
 | 参数 | 非流式模式 | 流式模式 |
 |------|-----------|---------|
 | `lyrics` | 中文 5~350 字符，英文 5~2000 字符 | 中文 300~350 字，英文 200~250 词 |
 | `prompt` | 1~2000 字符 | 5~1000 个中文汉字或英文单词 |
 
+> **注意**：流式模式下 `lyrics` 的最小长度要求（300 字 / 200 词）远高于非流式模式（5 字符），使用流式输出时需确保歌词内容足够长。
+
 ## 使用方式
 
-### 非流式调用
+**非流式调用示例：**
 
 ```bash
 curl -X POST 'https://dashscope.aliyuncs.com/api/v1/services/audio/music/generation' \
@@ -64,42 +59,47 @@ curl -X POST 'https://dashscope.aliyuncs.com/api/v1/services/audio/music/generat
 }'
 ```
 
-非流式模式直接返回完整音频的 OSS URL。
+**流式调用示例：**
 
-### 流式调用
-
-添加请求头 `X-DashScope-SSE: enable`，响应以 SSE 事件流返回：
-- **中间消息**：`audio.data` 包含 Base64 编码的音频片段，`finish_reason` 为 `null`
-- **最终消息**：包含完整音频 URL、歌词、采样率等元信息，`finish_reason` 为 `stop`
+```bash
+curl -X POST 'https://dashscope.aliyuncs.com/api/v1/services/audio/music/generation' \
+-H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+-H "Content-Type: application/json" \
+-H "X-DashScope-SSE: enable" \
+-d '{
+    "model": "fun-music-v1",
+    "input": {
+        "prompt": "节奏感强的电子舞曲，合成器音效，充满能量，适合健身运动场景",
+        "gender": "male"
+    }
+}'
+```
 
 ## 返回结构
 
-| 字段 | 说明 |
-|------|------|
-| `output.audio.url` | 完整音频 OSS URL，有效期 24 小时 |
-| `output.audio.data` | 流式模式下的 Base64 音频片段 |
-| `output.extra_info.lyrics` | 生成的歌词内容 |
-| `output.extra_info.channels` | 声道数（2 = 立体声） |
-| `output.extra_info.sample_rate` | 采样率（如 48000） |
-| `output.finish_reason` | `null` 生成中 / `stop` 生成结束 |
-| `usage.duration` | 音乐时长（秒），用于计费 |
+返回对象的核心字段：
 
-## 限制和注意事项
+| 字段路径 | 类型 | 说明 |
+|---------|------|------|
+| `output.audio.url` | string | 完整音频文件的 OSS URL，有效期 **24 小时** |
+| `output.audio.data` | string | 流式模式下的 Base64 音频数据片段；非流式为空字符串 |
+| `output.audio.id` | string | 音频文件 ID |
+| `output.audio.expires_at` | integer | URL 过期时间戳（Unix timestamp） |
+| `output.extra_info.lyrics` | string | 生成的歌词内容 |
+| `output.extra_info.channels` | integer | 声道数（如 2 为立体声） |
+| `output.extra_info.sample_rate` | string | 采样率（如 "48000"） |
+| `output.finish_reason` | string | `null` 生成中；`stop` 生成结束 |
+| `usage.duration` | integer | 音乐时长（秒），用于计费 |
 
-- **地域限制**：仅在中国内地（北京地域）可用
-- **访问权限**：邀测阶段，需申请开通
-- **输入互斥**：`lyrics` 和 `prompt` 同时存在时以 `lyrics` 为准
-- **流式模式字符限制更严格**：歌词在流式模式下要求中文 300~350 字，远高于非流式模式的最低 5 字符
-- **URL 有效期**：音频下载链接 24 小时后过期
-- **AIGC 水印**：开启后会在音频末尾追加摩尔斯电码信号（`·— ··`），增加音频时长
+流式模式下，中间消息通过 `data` 字段返回 Base64 音频片段，最终消息包含完整的 `url`、`extra_info` 和 `usage` 信息。
 
-详细参数说明和完整返回示例请参阅 [音乐生成Fun-Music API参考](../../raw/model-api-reference/music-generation-references/fun-music-api.md)。
+## 限制与注意事项
 
-## 相关概念
-
-- [[get-api-key]] - 获取 API Key
-- [[audio-generation-references]] - 音频生成相关 API
-- [[billing]] - 计费说明
+- **邀测阶段**：根据 [音乐生成Fun-Music API参考](../../raw/model-api-reference/music-generation-references/fun-music-api.md)，Fun-Music 模型目前处于邀测状态，需在模型广场申请开通后方可使用。
+- **区域限制**：仅在中国内地（北京地域）部署范围下可用。
+- **参数优先级**：当 `lyrics` 和 `prompt` 同时传入时，仅 `lyrics` 生效，`prompt` 被忽略。
+- **URL 有效期**：返回的音频 OSS URL 有效期为 24 小时，需及时下载或转存。
+- **水印影响**：开启 `enable_aigc_watermark` 会在音频末尾追加摩尔斯电码信号，导致音频时长增加。
 
 ## 来源文档
 

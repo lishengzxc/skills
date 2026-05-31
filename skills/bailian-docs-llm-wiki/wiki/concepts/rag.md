@@ -1,84 +1,119 @@
 # 检索增强生成（RAG）
 
-检索增强生成（Retrieval-Augmented Generation, RAG）是一种在大模型生成回答前，先从外部知识源中检索相关内容并注入上下文的技术范式，用于解决大模型在私有知识、实时信息等方面的不足，提升回答的准确性和可靠性。
+检索增强生成（Retrieval-Augmented Generation, RAG）是一种让大模型在生成回答前先从外部知识源中检索相关内容的技术，用于弥补大模型在私有知识、实时信息等方面的不足，提升特定领域问答的准确性和可靠性。
 
-## 核心原理
+## 工作原理
 
-RAG 的基本流程分为三个阶段：
+RAG 的核心流程分为三个阶段：
 
-1. **索引（Indexing）**：将文档切片并通过向量模型（如 `text-embedding-v4`）转为数值向量，存入向量数据库
-2. **检索（Retrieval）**：用户提问时，将查询同样向量化，通过语义相似度从知识库中召回相关文本切片
-3. **生成（Generation）**：将召回的切片作为上下文注入 Prompt，由大模型基于这些参考信息生成回答
+1. **建立索引**：对文档进行解析、切片与向量化处理，将内容存入向量存储
+2. **检索召回**：根据用户查询，从向量存储中匹配并召回语义相关的知识片段
+3. **生成答案**：大模型根据召回的知识片段和用户查询生成最终回答
 
-在检索与生成之间，通常还会引入 **Rerank（重排序）** 步骤，使用排序模型（如 `qwen3-rerank`）对初步召回结果做二次精排，提升最终送入模型的内容质量。
+知识库支持语义检索，即使查询关键词与实际答案完全不同，也能找到语义相关的内容。
 
 ## 在百炼平台中的使用场景
 
-### 1. 知识库集成（云端 RAG）
+### 云端知识库（零代码/低代码）
 
-百炼平台的 [[knowledge-base]] 是 RAG 的核心载体。通过控制台或 API 创建知识库后，可集成到不同类型的应用中：
+百炼平台的知识库是基于 RAG 技术的核心组件，支持通过控制台零代码方式快速搭建。典型流程为：上传知识文档 → 创建知识库并选择切分策略 → 在智能体或工作流应用中关联知识库 → 发布应用。
 
-| 集成方式 | 说明 |
-|---------|------|
-| **智能体应用** | 在 [[llm-application]] 配置中添加知识库。新版 Agent 2.0 将知识库统一为工具，由智能体自主决策何时调用 |
-| **工作流应用** | 在工作流中拖入知识库节点，支持固定知识库或通过 `CodeList` 变量动态引入 |
-| **外部应用** | 通过 [[bailian-sdk]] 调用 `Retrieve` API 检索知识库，自行拼装 Prompt |
+知识库支持多种类型，覆盖不同内容形态：
 
-### 2. 框架集成
+| 类型 | 适用场景 |
+|------|---------|
+| 文档搜索 - 基础文档问答 | 纯文本文档的语义检索 |
+| 文档搜索 - 图文并茂回复 | 需要返回图文混排内容 |
+| 文档搜索 - 视觉理解 | 含复杂排版、图表、公式的 PDF/图片文档 |
+| 文档搜索 - 极速问答 | 高度结构化或简单文档（FAQ、参数表），低延迟优化 |
+| 数据查询 | 结构化数据（xlsx/xls） |
+| 图片问答 / 音视频搜索 | 图片、音视频文件的内容理解 |
 
-通过 [[frameworks]] 快速构建 RAG 应用：
+### 智能体应用中的 RAG
 
-- **LlamaIndex（Python）**：使用 `DashScopeCloudIndex.from_documents()` 上传文档创建云端知识库，通过 `query_engine` 实现检索问答
-- **Spring AI Alibaba（Java）**：通过 `DashScopeDocumentRetriever` 检索百炼云端知识库，结合 `ChatClient` 和 `DocumentRetrievalAdvisor` 实现 RAG 问答
+- **Agent 2.0（新版）**：知识库作为工具之一，由智能体自主规划调用时机和顺序，适合多工具协作场景
+- **Agent 1.0（旧版）**：知识库检索先行，再决策是否调用其他工具，适合意图单一的简单问答
 
-### 3. 本地 RAG
+召回的文本切片会占用模型上下文窗口并增加输入 Token 消耗。
 
-使用本地嵌入模型和向量存储构建本地知识库，适合对数据安全有严格要求或需要自定义切分策略的场景。支持 PDF、DOCX、TXT、XLSX、CSV 等格式。详见 [[application-use-cases]]。
+### 工作流应用中的 RAG
 
-### 4. 文件问答
+在工作流画布中添加「知识库」节点，支持固定选择或动态引入知识库，适合将 RAG 嵌入预定义的多步骤任务流程。
 
-智能体应用中的 **切片检索模式** 本质上是会话级 RAG：上传的文件被实时切片和向量化，用户针对文件内容提问时通过检索定位相关片段。适合长文档问答和精确信息定位。
+### 通过框架构建 RAG 应用
+
+| 框架 | 语言 | 说明 |
+|------|------|------|
+| LlamaIndex | Python 3.9+ | 提供从文件解析到云端知识库构建、检索引擎和问答的完整流程 |
+| Spring AI Alibaba | Java（JDK 17+） | 通过 `DashScopeDocumentRetriever` 检索百炼知识库，结合大模型生成回答 |
+
+### 本地 RAG
+
+适合需要灵活控制检索流程的场景，通过 Python + LlamaIndex 在本地文件系统上构建向量索引和检索引擎，可自定义切分策略和嵌入模型。
 
 ## 关键参数与配置
 
-### 索引阶段
+### 索引配置（创建时设定，不可更改）
 
-| 参数 | 说明 | 注意事项 |
-|------|------|---------|
-| **向量模型** | `text-embedding-v4`（支持 64–2048 维）、`text-embedding-v3`（支持 64–1024 维） | 创建后维度不可更改。详见 [[general-text-embedding]] |
-| **切片方式** | 智能切分（推荐）或按长度切分，最大 6,000 Token/片 | 创建后不可更改 |
-| **Meta 信息抽取** | 为切片附加元数据（key-value），提升检索精度 | 创建后无法再配置 |
-| **多轮对话改写** | 根据历史对话自动补全用户查询，解决指代消解问题 | 创建后无法再开启 |
-| **text_type** | 区分 `query`（查询文本）和 `document`（底库文本），用于非对称检索场景 | 仅部分接口支持 |
+| 参数 | 说明 |
+|------|------|
+| **切片方式** | 推荐「智能切分」（基于语义自适应切分），也可选「按长度切分」 |
+| **向量模型（Embedding）** | 文档搜索类支持 text-embedding-v4（推荐）/ v3（512 维）；图片问答类使用 multimodal-embedding-v1（1024 维） |
+| **Meta 信息抽取** | 为切片附加元数据（常量、变量、大模型提取、正则、关键词），提升检索精度 |
+| **多轮对话改写** | 根据历史对话自动补全用户查询，创建后不可追加开启 |
 
-### 检索阶段
+> **注意**：切片方式、向量模型和 Meta 信息抽取在知识库创建后均无法更改，请在创建时慎重配置。
 
-| 参数 | 说明 | 建议值 |
-|------|------|--------|
-| **相似度阈值** | 仅语义相似度高于此值的切片才被召回 | 需通过命中测试反复调试，过高会丢弃相关内容 |
-| **TopK（召回片段数）** | 最终返回给大模型的知识片段数量 | 1–20，增大可提升准确性但增加 Token 消耗 |
-| **初步向量检索 TopK** | 语义相似性初步召回数量 | 默认 50，降低可减少 Rerank 费用 |
-| **初步关键词检索 TopK** | 文本匹配初步召回数量 | 默认 50 |
-| **权重** | 多知识库场景下干预召回顺序 | 按信息源重要程度分配，仅同类型知识库间生效 |
+### 检索参数（可动态调整）
+
+| 参数 | 说明 |
+|------|------|
+| **相似度阈值**（similarity_cutoff） | 仅语义相似度高于此阈值的文本才会被召回；为 0 时不做剔除，设置过高会丢弃相关内容 |
+| **召回片段数**（TopK） | 最终返回的切片数量，上限 20。增大可提升回答完整性，但增加 Token 消耗和噪声 |
+| **权重** | 多知识库场景下按重要程度分配，仅在同类型知识库之间生效 |
+| **标签过滤** | 通过文件标签在向量检索前筛选目标文件 |
 
 ### 重排序（Rerank）
 
-使用 [[more-models]] 中的排序模型对初步召回结果做精排：
+检索召回后可通过文本排序模型进行二次精排，进一步提升结果准确率：
 
-| 模型 | 适用场景 | 最大文档数 |
-|------|---------|-----------|
-| `qwen3-rerank` | 文本语义检索、RAG | 500 |
-| `qwen3-vl-rerank` | 跨模态搜索（文本+图片+视频） | 文本 100 / 图片 40 / 视频 4 |
+| 模型 | 场景 |
+|------|------|
+| qwen3-rerank | 文本语义检索、RAG 精排 |
+| qwen3-vl-rerank | 跨模态搜索、图片检索 |
 
-关键参数：`top_n`（返回前
+LlamaIndex 中可通过 `DashScopeRerank` 组件集成重排序，关键参数 `top_n` 控制重排后返回的结果数。
+
+### 框架侧参数示例
+
+```python
+# LlamaIndex
+similarity_top_k = 5       # 检索返回的最大结果数
+similarity_cutoff = 0.4    # 最低相似度阈值
+top_n = 1                  # 重排后返回的结果数
+```
+
+```java
+// Spring AI Alibaba
+DocumentRetriever retriever = new DashScopeDocumentRetriever(
+    dashscopeApi,
+    DashScopeDocumentRetrieverOptions.builder()
+        .withIndexName("知识库名称")
+        .build());
+```
+
+## 云端 RAG 与本地 RAG 对比
+
+| 维度 | 云端 RAG（百炼知识库） | 本地 RAG |
+|------|----------------------|---------|
 
 ## 关联主题页
 
-- [[knowledge-base|knowledge base]] — `../guides/knowledge-base.md`
-- [[frameworks|frameworks]] — `../api/[[frameworks|frameworks]].md`
-- [[llm-application|llm application]] — `../guides/llm-application.md`
-- [[application-use-cases|application use cases]] — `../guides/application-use-cases.md`
-- [[use-cases|use cases]] — `../guides/use-cases.md`
-- [[more-models|[[more|more]] models]] — `../api/[[more|more]]-models.md`
-- [[general-text-embedding|general text embedding]] — `../api/general-text-embedding.md`
+- [knowledge base](../guides/knowledge-base.md)
+- [llm application](../guides/llm-application.md)
+- [frameworks](../api/frameworks.md)
+- [application use cases](../guides/application-use-cases.md)
+- [use cases](../guides/use-cases.md)
+- [start using](../guides/start-using.md)
+- [more models](../api/more-models.md)
 

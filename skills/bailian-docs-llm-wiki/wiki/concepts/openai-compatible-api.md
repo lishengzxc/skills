@@ -1,51 +1,60 @@
 # OpenAI 兼容接口
 
-OpenAI 兼容接口是百炼平台提供的一组遵循 OpenAI API 规范的服务端点，开发者只需将 `base_url`、`api_key` 和 `model` 三个参数指向百炼，即可使用 OpenAI SDK 及生态工具调用千问（Qwen）全系列及 DeepSeek、Kimi、GLM 等第三方模型，无需修改业务代码逻辑。
+OpenAI 兼容接口是阿里云百炼平台提供的一套遵循 OpenAI API 协议规范的服务端点，开发者只需将 `base_url` 和 `api_key` 替换为百炼平台的对应值，即可使用 OpenAI SDK 及其生态工具直接调用百炼上的模型和应用，实现低成本迁移。
 
-## 核心配置
+## 核心价值
 
-接入百炼 OpenAI 兼容接口只需配置三个参数：
+- **零改造迁移**：已有 OpenAI 代码仅需修改 `base_url`、`api_key` 和 `model` 三个参数即可接入百炼。
+- **生态兼容**：支持 LangChain、Cursor、Claude Code、Cherry Studio、Dify 等主流框架和工具通过该接口对接。
+- **多接口覆盖**：涵盖对话生成、文本补全、向量化、文件管理、批量推理等常见场景。
 
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| `api_key` | 百炼 API Key，建议通过环境变量 `DASHSCOPE_API_KEY` 传入 | 参见 [[api-key]] |
-| `base_url` | 服务端点，因地域和计费方案不同而异（见下表） | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| `model` | 模型名称 | `qwen-plus`、`qwen3.6-plus` 等，详见 [[models]] |
+## 支持的接口端点
 
-### 各地域 Base URL（按量计费）
+| 接口类型 | 用途 | 端点路径 |
+|---------|------|---------|
+| Chat Completions | 对话生成（最常用） | `/compatible-mode/v1/chat/completions` |
+| Responses | 内置工具的智能体调用 | `/compatible-mode/v1/responses` |
+| Completions | 文本/代码补全 | `/compatible-mode/v1/completions` |
+| Embeddings | 文本向量化 | `/compatible-mode/v1/embeddings` |
+| Files | 文件上传与管理 | `/compatible-mode/v1/files` |
+| Batch | 批量推理 | `/compatible-mode/v1/batches` |
 
-| 地域 | Base URL |
+## 关键参数配置
+
+### BASE_URL
+
+根据部署地域选择：
+
+| 地域 | BASE_URL |
 |------|----------|
-| 北京（默认） | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| 华北2（北京） | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
 | 新加坡 | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` |
-| 弗吉尼亚 | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` |
+| 美国（弗吉尼亚） | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` |
+| 德国（法兰克福） | `https://{WorkspaceId}.eu-central-1.maas.aliyuncs.com/compatible-mode/v1` |
 
-其他计费方案使用独立端点：
+> **重要**：不同地域的 API Key 相互独立，切换地域时必须同步更换 API Key。模型列表也因地域而异。
 
-| 方案 | Base URL |
-|------|----------|
-| Token Plan 团队版 | `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` |
-| Coding Plan | `https://coding.dashscope.aliyuncs.com/v1` |
-| Batch（批量推理） | `https://batch.dashscope.aliyuncs.com/compatible-mode/v1` |
+### API Key
 
-## 支持的接口类型
+在百炼控制台的 API Key 管理页面创建，建议配置为环境变量：
 
-| 接口 | 端点路径 | 适用场景 |
-|------|----------|----------|
-| **Chat Completions** | `/chat/completions` | 文本对话、多轮会话、视觉理解，最常用 |
-| **Responses** | `/responses` | Chat Completions 的演进版，支持联网搜索等内置工具 |
-| **Completions** | `/completions` | 代码补全（仅 Qwen Coder 模型） |
-| **Embedding** | `/embeddings` | 文本向量化（text-embedding-v1~v4） |
-| **Files** | `/files` | 文件上传与管理 |
-| **Batch** | `/batches` | 异步批量推理，成本为实时调用的 50% |
+```bash
+export DASHSCOPE_API_KEY="sk-xxx"
+```
 
-## 基础用法
+### 模型名称
 
-**Python（OpenAI SDK）**
+直接使用百炼平台的模型标识符，如 `qwen3.7-max`、`qwen3.6-plus`、`qwen3.6-flash`、`text-embedding-v4` 等。
+
+## 使用场景
+
+### 1. 模型直接调用
+
+最基础的用法，通过 OpenAI SDK 调用百炼上的千问及第三方模型：
 
 ```python
-import os
 from openai import OpenAI
+import os
 
 client = OpenAI(
     api_key=os.getenv("DASHSCOPE_API_KEY"),
@@ -53,7 +62,7 @@ client = OpenAI(
 )
 
 completion = client.chat.completions.create(
-    model="qwen-plus",
+    model="qwen3.6-plus",
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "你是谁？"}
@@ -62,49 +71,51 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 ```
 
-**curl**
+### 2. 应用调用（智能体/工作流）
 
-```bash
-curl -X POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions \
-  -H "Authorization: Bearer $DASHSCOPE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen-plus",
-    "messages": [{"role": "user", "content": "你是谁？"}]
-  }'
+百炼应用也提供 OpenAI 兼容的 Responses API 调用方式，`base_url` 中需包含应用 ID：
+
+```python
+client = OpenAI(
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    base_url=f"https://dashscope.aliyuncs.com/api/v2/apps/agent/{app_id}/compatible-mode/v1/"
+)
+response = client.responses.create(input="你是谁？")
 ```
 
-安装 SDK：`pip install -U openai`
+### 3. 第三方工具接入
 
-## 在百炼平台各场景中的使用
+Cursor、Claude Code、Cherry Studio、Dify 等工具均支持配置自定义 OpenAI 兼容端点。只需在工具的 API 设置中填入百炼的 BASE_URL 和 API Key 即可完成对接。
 
-### 文本生成与视觉理解
+### 4. 专用模型调用
 
-文本对话、多轮会话、图片/视频分析等场景均通过 Chat Completions 接口调用。支持思考模式（`enable_thinking`）、Function Calling、结构化输出等高级能力。详见 [[deep-thinking]]、[[tool-calls]]、[[structured-output]]。
+机器翻译（Qwen-MT）、OCR（Qwen-OCR）、语音翻译等专用模型也通过 OpenAI 兼容接口调用，部分模型需通过 `extra_body` 传入非标准参数：
 
-### 专用模型
+```python
+completion = client.chat.completions.create(
+    model="qwen-mt-plus",
+    messages=[{"role": "user", "content": "需要翻译的文本"}],
+    extra_body={"translation_options": {"source_lang": "zh", "target_lang": "en"}}
+)
+```
 
-机器翻译（`qwen-mt-plus`）、OCR（`qwen-vl-ocr-latest`）、GUI 自动化（`gui-plus`）等专用模型支持 OpenAI 兼容接口。专用参数通过 `extra_body` 传入，例如翻译模型的 `translation_options`。详见 [[specialized-model]]。
+## 与其他接口的关系
 
-### 语音识别
+百炼平台同时提供 DashScope 原生接口和 Anthropic 兼容接口。三者对比：
 
-仅 `qwen3-asr-flash` 模型支持通过 OpenAI 兼容接口进行录音文件识别；实时语音识别需使用 WebSocket 协议。
-
-### 批量推理
-
-通过 Batch 接口提交 JSONL 文件进行异步批量推理，成本约为实时调用的 50%。详见 [[batch-inference]]。
-
-### 第三方工具与框架集成
-
-Cursor、Claude Code、Codex、Cherry Studio、Dify 等工具均可通过配置 Base URL 和 API Key 接入百炼。LlamaIndex 和 Spring AI Alibaba 等开发框架同样基于该兼容接口集成。详见 [[
+| 维度 | OpenAI 兼容接口 | DashScope 接口 | Anthropic 兼容接口 |
+|------|----------------|---------------|-------------------|
+| 迁移成本 | 最低（OpenAI 生态） | 需适配专有 SDK | 低（Anthropic 生态） |
+| 功能覆盖 | 覆盖主流场景 | 最完整 | 支持思考和工具调用 |
+| 适用场景 | 已有 OpenAI 代码或工具链 | 需要平台全部能力 | 使用
 
 ## 关联主题页
 
-- [[get-started-with-models|get started with models]] — `../guides/get-started-with-models.md`
-- [[toolkits-and-[[frameworks|frameworks]]|toolkits and frameworks]] — `../api/toolkits-and-[[frameworks|frameworks]].md`
-- [[use-chat-client-or-development-tool|use chat client or development tool]] — `../guides/use-chat-client-or-development-tool.md`
-- [[model-inference|model inference]] — `../guides/model-inference.md`
-- [[specialized-model|specialized model]] — `../api/specialized-model.md`
-- [[speech-recognition-api-reference|speech recognition api reference]] — `../api/speech-recognition-api-reference.md`
-- [[frameworks|frameworks]] — `../api/[[frameworks|frameworks]].md`
+- [toolkits and frameworks](../api/toolkits-and-frameworks.md)
+- [get started with models](../guides/get-started-with-models.md)
+- [use chat client or development tool](../guides/use-chat-client-or-development-tool.md)
+- [qwen api reference](../api/qwen-api-reference.md)
+- [application call](../api/application-call.md)
+- [specialized model](../api/specialized-model.md)
+- [speech translation api reference](../api/speech-translation-api-reference.md)
 
