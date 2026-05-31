@@ -142,3 +142,4 @@
 - [[general-text-embedding|general text embedding]] — `../api/general-text-embedding.md`
 - [[multimodal-vector|multimodal vector]] — `../api/multimodal-vector.md`
 
+

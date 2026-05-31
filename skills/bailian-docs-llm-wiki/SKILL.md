@@ -1,5 +1,5 @@
 ---
-name: bailian-docs-llm-wiki
+name: bailian-docs-llm-wiki2
 description: >-
   阿里云百炼平台技术文档知识库（LLM Wiki）。当用户查询百炼模型列表、API 参数、错误码、
   应用开发（智能体/RAG/知识库/记忆/插件）、模型对比与定价、SDK/OpenAI 兼容接口、
