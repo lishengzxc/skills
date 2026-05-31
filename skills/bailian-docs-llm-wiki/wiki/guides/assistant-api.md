@@ -1,43 +1,60 @@
 # assistant api
 
-Assistant API 提供了一套标准化的服务端接口，用于快速构建具备多轮对话、上下文管理与工具调用能力的大模型应用。该接口通过封装模型推理流程与状态机逻辑，有效降低了复杂 AI Agent 的集成门槛。详细接口规范与交互说明可参考 [Assistant API（下线中）](../../raw/application-user-guide/assistant-api.md)。
+Assistant API 是百炼平台提供的大模型应用开发接口，内置多轮对话管理和工具调用组件，帮助开发者快速构建个人助理、智能导购等应用。相比直接使用[[text-generation]] API，Assistant API 封装了上下文管理和流程控制，降低了开发复杂度。
 
-## 支持的模型/功能
-- **模型支持**：兼容千问系列核心模型，标识符包括 `qwen-turbo`、`qwen-plus`、`qwen-max`。
-- **内置工具生态**：原生集成多款官方工具及扩展调用方式，无需额外配置外部服务。
-  | 工具名称 | 标识符 | 适用场景 |
-  |---|---|---|
-  | 代码解释器 | `code_interpreter` | Python 执行、数学计算、数据分析 |
-  | 夸克搜索 | `quark_search` | 实时网络信息检索 |
-  | 文生图 | `text_to_image` | 文本转图像生成 |
-  | 计算器 | `calculator` | 高精度数值运算 |
-  | 生成二维码 | `generate_qrcode` | 文本转二维码 |
-  | GitHub搜索 | `github_search` | 开源项目信息检索 |
-  | [[function-calling|函数调用]] | `function` | 本地环境自定义逻辑执行 |
-  | 知识检索增强 | `rag` | 外部知识库匹配与引用 |
-  | 自定义插件 | `${plugin_id}` | 对接内部业务接口 |
-- **核心能力**：自动维护 [[上下文管理]] 历史，支持 [[流式输出]]，并提供标准化编排模板以实现 [[多智能体]] 协同。完整能力矩阵详见 [Assistant API（下线中）](../../raw/application-user-guide/assistant-api.md)。
+> **注意**：Assistant API 当前处于**下线中**状态，建议迁移至 [[responses-api]]（Responses API），后者同样内置多种工具并支持多轮上下文管理，可作为替代方案。
 
-## 关键参数
-API 交互依赖以下四个核心对象参数，需按生命周期顺序实例化：
-- **Assistant**：定义模型基座（`model`）、系统指令（`instructions`）及启用的工具列表（`tools`）。
-- **Thread**：会话级容器（`thread_id`），用于持久化存储多轮交互记录，解除开发者手动拼接 `history` 的负担。
-- **Message**：内容载体，需指定 `role`（`user` / `assistant` / `system`）与 `content`。支持附加文件元数据。
-- **Run**：推理与执行控制器。关键状态包括 `in_progress`、`requires_action`（待提交工具输出）、`completed` / `failed`。支持配置 `stream: true` 开启实时事件推送。
+## 核心概念与使用流程
 
-## 使用方式
-标准调用链路遵循 `创建会话 -> 注入上下文 -> 触发执行 -> 处理回调` 模式：
-1. 调用 `Assistants.create` 初始化配置。
-2. 调用 `Threads.create` 获取独立 `thread_id`。
-3. 调用 `Messages.create` 追加用户输入。
-4. 调用 `Runs.create` 启动推理流。若返回 `thread.run.requires_action`，需解析 `tool_calls` 参数，在本地执行对应逻辑后，调用 `Runs.submit_tool_outputs` 将结果回传，直至 `run` 状态终结。
-完整状态流转示例、事件枚举处理及工具回调代码可在 [Assistant API（下线中）](../../raw/application-user-guide/assistant-api.md) 中获取。
+根据 [Assistant API（下线中）](../../raw/application-user-guide/assistant-api.md) 的描述，构建一个 Assistant 应用通常需要四个步骤：
+
+1. **创建 Assistant**：配置大模型、系统指令和工具列表，定义 Assistant 的能力边界。
+2. **创建 Thread**：Thread 记录用户和 Assistant 之间的所有消息，实现多轮对话上下文管理。
+3. **创建 Message**：Message 是承载每一轮用户输入或 Assistant 回复的容器。
+4. **创建 Run**：Run 代表 Assistant 对当前对话的一次完整响应过程，包括模型推理和工具调用。支持启用[[streaming-output]]（[[streaming|流式输出]]）。
+
+## 支持的模型
+
+Assistant API 支持以下千问系列模型：
+
+| 模型系列 | 模型标识符 |
+|---------|-----------|
+| 千问-Turbo | `qwen-turbo` |
+| 千问-Plus | `qwen-plus` |
+| 千问-Max | `qwen-max` |
+
+> **注意**：千问-Turbo、千问-Plus、千问-Max 的快照版本（例如 `qwen-plus-1220`）仅兼容"函数调用"及"知识检索增强"工具，其他工具的兼容性以实际运行结果为准。
+
+## 支持的工具
+
+如 [Assistant API（下线中）](../../raw/application-user-guide/assistant-api.md) 所列，支持以下工具：
+
+| 工具 | 标识符 | 用途 |
+|------|--------|------|
+| 代码解释器 | `code_interpreter` | 执行 Python 代码，适用于编程、数学计算、数据分析 |
+| 夸克搜索 | `quark_search` | 实时检索网络信息 |
+| 文生图 | `text_to_image` | 将文字描述转为图像 |
+| 计算器 | `calculator` | 精确数学运算 |
+| 生成二维码 | `generate_qrcode` | 文本转二维码 |
+| GitHub搜索 | `github_search` | 搜索 GitHub 项目实时信息 |
+| 函数调用 | `function` | 本地设备执行自定义功能（[[function-calling]]） |
+| 知识检索增强 | `rag` | 检索外部知识，增强回答准确性 |
+| 自定义插件 | `${plugin_id}` | 连接自定义业务接口 |
+
+## 关键能力
+
+- **内置对话管理**：Thread 自动维护对话历史，开发者无需手动拼接上下文。
+- **工具调用流程**：Run 执行过程中可能触发 `thread.run.requires_action` 事件，此时需要提交工具输出（`submit_tool_outputs`）后继续执行。
+- **多智能体编排**：可基于 Assistant 的封装快速搭建 Multi Agent 系统，通过规划 Agent 分配任务顺序，依次调用不同 Assistant 处理。
 
 ## 限制和注意事项
-> **注意**：该 API 目前处于**下线中**阶段，官方已停止新增功能迭代。建议新项目全面迁移至 [[responses-api]]，新接口提供更完整的上下文生命周期管理及更丰富的原生工具支持。
-- **体系隔离**：[[智能体应用]] 与 Assistant API 创建的实例在底层完全独立。控制台配置的应用仅能通过应用调用 API 访问，不可混用本接口管理。
-- **快照版本兼容限制**：使用 `qwen-plus-1220`、`qwen-max-1220` 等带日期的快照版本时，系统仅支持 `function` 与 `rag` 工具。如需调用 `code_interpreter` 或搜索类工具，请使用无后缀的最新版本标识符。
-- **容错建议**：自定义插件与外部搜索工具的执行成功率受网络及目标服务稳定性影响。建议在 `submit_tool_outputs` 环节增加重试机制与异常拦截，避免 `run` 状态因单次调用失败而永久阻塞。
+
+- Assistant API 正在下线，不建议新项目使用。迁移方案参见 [[responses-api]]。
+- [[agent-application]]（智能体应用）与 Assistant 功能相互独立：智能体应用通过控制台创建并使用应用调用 API 调用，Assistant 仅通过 Assistant API 操作。
+- 自定义插件的兼容性以实际执行结果为准。
+- [[streaming|流式输出]]通过 Run 的 `stream=True` 参数启用，事件类型包括 `thread.message.delta`、`thread.message.completed`、`thread.run.step.delta`、`thread.run.completed` 等。
+
+更多细节请参考 [Assistant API（下线中）](../../raw/application-user-guide/assistant-api.md) 原始文档。
 
 ## 来源文档
 

@@ -1,44 +1,117 @@
-# 函数调用
+# 函数调用（工具调用）
 
-函数调用（Function Calling）是大语言模型将自然语言意图转化为结构化外部工具请求的机制。模型根据上下文与系统指令自主调度已注册的插件、API 或协议服务，执行外部逻辑后回传结果，从而突破纯文本生成边界并实现复杂业务闭环。
+函数调用（Function Calling），也称工具调用（Tool Calling），是指大模型在推理过程中根据用户输入自主判断是否需要调用外部函数或工具，并生成符合预定义格式的调用参数，由客户端执行后将结果返回模型以生成最终回答的机制。
 
-## 在百炼平台不同场景中的使用
-百炼平台提供多种架构范式支持函数调用，开发者可根据业务确定性需求选择适配路径：
-- **[[智能体应用]]**：采用提示词驱动与模型自主规划架构（ReAct）。开发者挂载工具后，模型基于对话上下文动态触发调用、解析参数并串联多步执行。支持配置 `ReAct 最大轮次`（1-50）控制单次会话的调用上限。
-- **[[工作流应用]]**：采用可视化节点确定性编排。函数调用被固化为独立插件或代码节点，参数流转需手动通过变量映射串联，不依赖模型自主决策，适用于高稳定性要求的固定业务链。
-- **API 直调与 Assistant 架构**：通过请求体 `tools` 字段声明可用函数。模型推理遇外部任务时，返回 `requires_action` 状态及结构化 `tool_calls` 指令。开发者需在本地环境执行逻辑，并调用 `Runs.submit_tool_outputs` 回传结果以驱动状态机流转。
-- **[[模型上下文协议]] (MCP)**：基于 JSON-RPC 标准化协议接入外部服务。在智能体中作为函数调用资源池由模型动态调度；在工作流中采用“单节点绑定单工具”模式。支持 `streamableHttp` 传输与云端异步任务执行。
+## 核心原理
 
-## 关键参数与配置
-| 参数/配置项 | 说明与应用场景 |
-|---|---|
-| `tools` / 工具声明 | 定义可用函数集合。需提供唯一标识符、功能描述及 JSON Schema 参数定义，直接决定模型路由准确率。 |
-| `tool_calls` / `requires_action` | 模型返回的调用指令结构。包含目标工具 ID 及从上下文中提取的入参值。在 Assistant API 中表现为 `Run` 对象的阻塞状态。 |
-| `submit_tool_outputs` | 用于回传工具执行结果的核心接口。结果将自动拼接至上下文，触发模型二次推理并生成最终答复。 |
-| `biz_params` (业务透传) | 应用调用 API 中的动态参数注入字段。通过 `user_defined_params` 结构可将运行时变量精准路由至指定自定义插件。 |
-| **入参映射策略** | 支持“大模型识别”（自动从对话提取）或“业务透传”（SDK/HTTP 显式传入）。出参结构需严格遵循 JSON 规范，子属性严禁为空。 |
-| **执行超时限制** | 自定义插件与工具执行默认存在 **5 秒超时**。高频或耗时场景建议改用 [[高代码应用]] 实现异步队列，或启用 MCP 极速模式消除冷启动。 |
+函数调用的本质是让大模型充当"决策者"：模型根据**用户输入**、**工具名称**和**工具描述**判断是否需要调用工具。当需要调用时，模型输出结构化的函数名和参数；客户端负责实际执行并将结果回传给模型，模型再基于工具返回结果生成最终响应。
 
-## 开发注意事项
-- **网络与安全边界**：官方 `code_interpreter` 隔离运行且无外网权限；MCP 自定义服务部署于无状态云端，**无固定公网 IP**，访问云资源需配置白名单或 VPC 互通。搜索类工具仅返回标题与摘要，不直接抓取网页详情。
-- **状态机与容错设计**：函数调用链路依赖严格的状态流转。外部服务网络波动易导致 `Run` 永久阻塞，建议在 `submit_tool_outputs` 环节增加指数退避重试与异常拦截。
-- **触发策略调优**：若模型未触发预期调用，优先检查工具描述（Description）是否清晰、System Prompt 是否划定调用边界，或尝试升级至 `qwen-max` 等强推理模型。
-- **架构演进提示**：旧版 `[[assistant api]]` 已处于**下线中**阶段。新建项目推荐迁移至 `[[responses-api]]` 或平台原生应用架构，以获得更完整的上下文生命周期管理与更低的集成维护成本。
+典型流程：
+1. 开发者在请求中定义可用工具（`tools` 参数）
+2. 模型推理后决定是否调用工具，若调用则返回函数名和参数
+3. 客户端执行对应函数，获取结果
+4. 将工具输出回传给模型
+5. 模型综合工具结果生成最终回答
 
-## 相关主题
-- [[智能体应用]]
-- [[工作流应用]]
-- [[模型上下文协议]]
-- [[插件]]
-- [[responses-api]]
-- [[assistant api]]
+## 在百炼平台的使用场景
+
+### API 直接调用
+
+百炼平台的多种接口协议均支持函数调用：
+
+| 接口 | 函数调用支持方式 |
+|------|-----------------|
+| [[openai-chat-completions]] | 通过 `tools` 参数定义函数，模型返回 `tool_calls` |
+| [[openai-responses]] | 内置工具 + 自定义函数调用 |
+| [[anthropic-messages]] | 兼容 Anthropic 工具调用格式 |
+| [[dashscope]] | 百炼原生接口，参数支持最全面 |
+
+### 智能体应用中的工具调用
+
+在 [[single-agent-application]] 中，函数调用以更高层次的形式存在：
+- **插件工具**：通过 [[plug-in]] 机制，智能体最多添加 10 个工具，模型自主决定调用时机
+- **MCP 工具**：通过 [[mcp]] 协议接入外部工具，智能体在多步推理中动态调用
+- 新版智能体（Agent 2.0）将知识库、MCP 统一为工具，支持完整的"规划-执行-反思"链路
+
+### Assistant API 中的函数调用
+
+在 [[assistant-api]] 中，函数调用的工具标识符为 `function`。当 Run 执行过程中触发 `thread.run.requires_action` 事件时，开发者需通过 `submit_tool_outputs` 提交工具执行结果后继续流程。
+
+### 实时多模态交互中的工具调用
+
+在 [[omni-realtime-api]] 中，通过 WebSocket 协议实现实时工具调用：
+1. 通过 `session.update` 的 `tools` 字段定义可用工具
+2. 模型自主判断是否调用
+3. 触发调用后，客户端执行函数并通过 `conversation.item.create` 事件回传结果
+
+> **注意**：实时 API 中 `tools` 和 `enable_search` 不兼容，不可同时开启。
+
+## 关键参数和配置
+
+### 工具定义格式（OpenAI 兼容）
+
+```json
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "获取指定城市的天气信息",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string",
+              "description": "城市名称"
+            }
+          },
+          "required": ["city"]
+        }
+      }
+    }
+  ]
+}
+```
+
+### 关键字段说明
+
+| 字段 | 说明 | 最佳实践 |
+|------|------|---------|
+| `name` | 函数名称，模型据此选择工具 | 使用语义明确的命名 |
+| `description` | 函数功能描述 | 详细描述功能和使用场景，直接影响模型调用准确性 |
+| `parameters` | JSON Schema 格式的参数定义 | 为每个参数提供 description |
+
+### 模型选择建议
+
+推荐选用具备强工具调用能力的模型（如 `qwen-max` 系列、`qwen-plus` 系列）。若调用失败率较高，可尝试：
+- 优化工具的 `description`，明确工具名称和能力边界
+- 更换更强的推理模型（如 Qwen3 系列）
+- 在系统提示词中引导工具使用时机
+
+## 函数调用 vs 插件 vs MCP
+
+| 维度 | 函数调用（API 层） | 插件（Plugin） | MCP |
+|------|-------------------|---------------|-----|
+| 执行方 | 客户端本地执行 | 百炼平台远程执行 | 云端 MCP 服务执行 |
+| 配置方式 | 代码中定义 `tools` | 控制台配置或 API 传入 | 协议标准化接入 |
+| 适用场景 | 需要访问本地资源或自定义逻辑 | 使用平台预置或自定义 API | 接入第三方标准化工具 |
+| 开发复杂度 | 需自行处理调用流程 | 平台托管执行 | 平台托管执行 |
+
+## 限制和注意事项
+
+- 工具的 `name` 和 `description` 质量直接影响模型的调用准确率
+- 单次请求中定义过多工具会增加 Token 消耗并可能降低选择准确性
+- 模型可能在不需要工
 
 ## 关联主题页
 
-- [[assistant-api|assistant api]] — `../guides/assistant-api.md`
+- [[qwen-api-reference|qwen api reference]] — `../api/qwen-api-reference.md`
+- [[omni-realtime-api|omni realtime api]] — `../api/omni-realtime-api.md`
 - [[plug-in|plug in]] — `../guides/plug-in.md`
 - [[model-context-protocol|model context protocol]] — `../guides/model-context-protocol.md`
 - [[llm-application|llm application]] — `../guides/llm-application.md`
-- [[bailian-application-calling|bailian [[application-call|application call]]ing]] — `../guides/bailian-application-calling.md`
-- [[assistantapi|assistantapi]] — `../api/[[assistantapi|assistantapi]].md`
+- [[assistant-api|assistant api]] — `../guides/assistant-api.md`
+- [[toolkits-and-[[frameworks|frameworks]]|toolkits and frameworks]] — `../api/toolkits-and-[[frameworks|frameworks]].md`
+- [[more-about-models|[[more|more]] about models]] — `../api/[[more|more]]-about-models.md`
 
