@@ -1,42 +1,132 @@
 # [[more|more]] models
 
-本页面汇总了百炼平台提供的垂直领域与能力增强型模型，涵盖检索重排序、法律垂域大语言模型及意图解析路由服务。开发者可根据 RAG 架构增强、合规业务问答或 Agent 工具调度等场景，直接调用对应模型的能力接口。所有模型均支持标准鉴权，并可通过 HTTP 或官方 SDK 快速集成至现有系统。
+百炼平台除了通用大语言模型外，还提供多种专用模型，涵盖文本排序（Rerank）、意图理解、法律行业等场景。这些模型通过 DashScope API 或兼容 OpenAI 的接口调用，适用于 RAG 检索增强、工具选择、行业垂直应用等开发需求。
 
-## 支持的模型/功能
+## 支持的模型
 
-| 模型标识 | 核心能力 | 典型场景 | 详情索引 |
-|:---|:---|:---|:---|
-| `qwen3-rerank`<br>`qwen3-vl-rerank`<br>`gte-rerank-v2` | 文本/多模态相关性重排序。支持跨语言、图像、视频的混合检索打分。 | 搜索引擎召回精排、[[rag]] 知识库切片匹配、向量检索后处理 | [文本排序](../../raw/model-api-reference/[[more|more]]-models/text-rerank-api.md) |
-| `farui-plus` | 法律行业垂直大模型。具备法律文书起草、条款审查、类案检索与法理推理能力。 | 企业法务助手、合规审查流水线、法律智能客服 | [通义法睿大语言模型](../../raw/model-api-reference/[[more|more]]-models/tongyi-farui-api.md) |
-| `tongyi-intent-detect-v3` | 百毫秒级意图分类与函数路由。支持纯意图标签输出、仅[[function-calling|函数调用]]或混合模式。 | Agent 意图识别、动态工具分发、对话状态管理 | [意图理解能力](../../raw/model-api-reference/more-models/intent-detect-capability.md) |
+### 文本排序模型
 
-## 关键参数
+文本排序模型用于对检索召回阶段的文档做二次精排，提升结果相关性。详见 [文本排序](../../raw/model-api-reference/[[more|more]]-models/text-rerank-api.md)。
 
-- **通用鉴权与环境**：所有接口要求 `Authorization: Bearer <DASHSCOPE_API_KEY>`，推荐通过环境变量注入以保障安全（参考 [[api-key-配置]]）。
-- **Rerank 参数差异**：
-  - `qwen3-rerank`：顶层参数接收 `instruct`（控制排序策略，如 `"Given a web search query..."`）与 `top_n`。
-  - `qwen3-vl-rerank` / `gte-rerank-v2`：参数嵌套于 `input` 与 `parameters` 中。多模态查询需使用 `{"text/image/video": "value"}` 结构；视频处理通过 `fps` 控制抽帧比例 `[0, 1]`。
-- **法睿模型**：标准 Generation 参数集。最大上下文 12K，输入上限 12K Token，输出上限 2K Token。
-- **意图模型**：无独立业务参数，完全依赖 `system` 提示词注入。若需极低延迟，建议将意图字典映射为单字符（如 `"A": "查天气"`），模型将强制输出单 Token。
+| 模型名称 | 最大文档数 | 单条最大Token | 请求最大Token | 语种 | 典型场景 |
+|---------|-----------|-------------|-------------|------|---------|
+| qwen3-rerank | 500 | 4,000 | — | 100+语种 | 文本语义检索、RAG |
+| qwen3-vl-rerank | 文本100/图片40/视频4 | 8,000 | 120,000 | 33种语言 | 跨模态搜索、图片检索 |
+| gte-rerank-v2 | — | — | 30,000 | 50+语种 | 文本排序 |
 
-## 使用方式
+> **注意**：gte-rerank 模型将于 2026-05-30 下线，推荐迁移至 qwen3-rerank。
 
-- **HTTP 直调**：Rerank 提供两套端点。`qwen3-rerank` 使用兼容路由 `/compatible-api/v1/reranks`，其余模型使用原生路由 `/api/v1/services/rerank/text-rerank/text-rerank`。请求体结构与响应格式（如 `results` 位于顶层或 `output` 内）互不兼容，需按模型严格区分。
-- **SDK 调用**：Python SDK (`dashscope`) 对 HTTP 嵌套结构进行了扁平化封装。例如 HTTP 中的 `input.query` 在 SDK 中直接作为顶层 `query` 参数传入。法睿与意图模型推荐使用 `dashscope.Generation.call` 或 OpenAI 兼容客户端，通过维护 `messages` 列表即可实现 [[多轮对话]] 与 [[流式输出]]。
-- **响应解析**：意图模型的返回体包含自定义 XML 标签 `<tags>`、`<tool_call>` 与 `<content>`。后端服务需使用正则表达式或 JSON 解析器提取 `tool_call` 数组，进而触发对应业务逻辑。
+### 意图理解模型
+
+| 模型名称 | 上下文长度 | 最大输出 | 输入成本 | 输出成本 |
+|---------|-----------|---------|---------|---------|
+| tongyi-intent-detect-v3 | 8,192 | 1,024 | 0.4元/百万Token | 1元/百万Token |
+
+该模型可在百毫秒级完成意图识别和工具选择，详见 [意图理解能力](../../raw/model-api-reference/[[more|more]]-models/intent-detect-capability.md)。
+
+### 法律行业模型
+
+| 模型名称 | 上下文长度 | 最大输出 | 输入成本 |
+|---------|-----------|---------|---------|
+| farui-plus | 12k | 2k | 20元/百万Token |
+
+通义法睿基于千问微调，支持法律咨询、文书生成、案情分析等任务，详见 [通义法睿大语言模型](../../raw/model-api-reference/more-models/tongyi-farui-api.md)。
+
+## 调用方式
+
+### 文本排序模型
+
+不同模型使用不同 API 端点：
+
+- **qwen3-rerank**：`POST https://dashscope.aliyuncs.com/compatible-api/v1/reranks`
+- **qwen3-vl-rerank / gte-rerank-v2**：`POST https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank`
+
+两种接口的请求体结构不同。`qwen3-rerank` 的 `query`、`documents` 等参数位于顶层；其他模型需嵌套在 `input` 和 `parameters` 对象中。
+
+SDK 调用示例（Python）：
+
+```python
+import dashscope
+
+resp = dashscope.TextReRank.call(
+    model="qwen3-rerank",
+    query="什么是文本排序模型",
+    documents=["文档1", "文档2", "文档3"],
+    top_n=2,
+    return_documents=True,
+    instruct="Given a web search query, retrieve relevant passages that answer the query."
+)
+```
+
+### 意图理解模型
+
+通过 [[openai-compatible-api|OpenAI 兼容接口]]或 DashScope SDK 调用，使用 [[chat-completions]] 式的 messages 结构。关键在于 System Message 的设置：
+
+- **意图 + 函数调用**：在 system [[prompt|prompt]] 中加入工具定义并声明 `Response in INTENT_MODE.`
+- **仅意图分类**：在 system [[prompt|prompt]] 中提供意图标签列表并声明 `Just reply with the chosen tag.`
+- **仅函数调用**：按标准 [[function-calling]] 方式配置
+
+> **注意**：意图理解模型的响应使用 `<tags>`、`<tool_call>`、`<content>` 标签格式，需自行解析，不同于标准 OpenAI function_call 响应结构。
+
+**性能优化技巧**：将意图类别映射为单个大写字母（A/B/C...），可使响应固定为 1 个 Token，显著降低延迟。
+
+### 法律行业模型
+
+farui-plus 使用标准的 `Generation.call` 接口，支持单轮、多轮对话及[[streaming|流式输出]]，与通用千问模型调用方式一致：
+
+```python
+import dashscope
+
+response = dashscope.Generation.call(
+    model="farui-plus",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "我哥欠我10000块钱，给我生成起诉书。"}
+    ],
+    result_format="message"
+)
+```
+
+## 关键参数说明
+
+### 排序模型特有参数
+
+| 参数 | 说明 |
+|------|------|
+| `top_n` | 返回排序后前 N 个文档，默认返回全部 |
+| `return_documents` | 是否返回文档原文（仅 gte-rerank-v2、qwen3-vl-rerank） |
+| `instruct` | 排序任务类型说明（仅 qwen3-rerank、qwen3-vl-rerank），建议英文撰写 |
+| `fps` | 视频帧率控制，范围 [0,1]（仅 qwen3-vl-rerank） |
+
+`relevance_score` 为 0.0–1.0 的相对分数，仅用于当前请求内排序，不可跨请求比较。
+
+### 请求 Token 计算（排序模型）
+
+```
+总Token = Query Tokens × Document数量 + Document Tokens总和
+```
+
+该值不得超过模型的请求最大输入 Token 限制。超长单条输入会被截断，可能导致排序结果不准确。
+
+## 前提条件
+
+所有模型调用前需要：
+
+1. 获取 [[api-key]] 并配置到环境变量 `DASHSCOPE_API_KEY`
+2. 如使用 SDK，需安装 [[dashscope-sdk]]
 
 ## 限制和注意事项
 
-- 单次请求总 Token 计算方式为 `Query Tokens × Document 数量 + Document Tokens 总和`，超出模型阈值将自动截断，可能导致排序结果失真。
-- `gte-rerank` 已进入下线周期，将于 2026-05-30 停止服务，存量代码建议尽快迁移至 `qwen3-rerank`。
-- 意图理解模型的 100 万 Token 免费额度仅在百炼平台开通后 90 天内有效，超时后将恢复标准计费。
-- 法睿模型输出上限为 2K Token，长篇幅法律文书生成建议结合流式接口分段接收，或在前置环节进行上下文裁剪。
-
-> **注意**：不同文档在 Rerank 参数层级描述上存在历史差异。若使用 `qwen3-vl-rerank` 或 `gte-rerank-v2`，请勿直接套用 `qwen3-rerank` 的兼容格式参数，否则会触发 `InvalidParameter` 或结构解析失败。同时，HTTP 接口返回的 `code`/`message` 仅在失败时出现，而 SDK 成功响应会额外包裹空的 `code`/`message` 字段，上层逻辑需做好字段判空处理。详细错误码对照请参考 [[错误码排查]]，并发限制请遵循 [[限流策略]]。
+- 排序模型的 `qwen3-vl-rerank` 对不同模态文档数量有独立限制（文本 100、图片 40、视频 4）
+- `qwen3-vl-rerank` 视频输入仅支持 URL，不支持 Base64；图片支持 URL 和 Base64
+- 意图理解模型不支持标准 `tools` 参数传入，需通过 system [[prompt|prompt]] 注入工具定义
+- farui-plus 仅支持输入计费（20元/百万Token），文档中未列出输出成本
+- 模型限流条件请参考 [[rate-limit]]
+- 错误码详情请参考 [[error-code]]
 
 ## 来源文档
 
 - [文本排序](../../raw/model-api-reference/more-models/text-rerank-api.md)
-- [通义法睿大语言模型](../../raw/model-api-reference/more-models/tongyi-farui-api.md)
 - [意图理解能力](../../raw/model-api-reference/more-models/intent-detect-capability.md)
+- [通义法睿大语言模型](../../raw/model-api-reference/more-models/tongyi-farui-api.md)
 

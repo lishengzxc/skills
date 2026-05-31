@@ -4,8 +4,12 @@
   "items": [
     {
       "inferenceMetadata": {
-        "response_modality": ["Text"],
-        "request_modality": ["Text"]
+        "response_modality": [
+          "Text"
+        ],
+        "request_modality": [
+          "Text"
+        ]
       },
       "openSource": false,
       "description": "通义晓蜜-对话分析-pro是专注于高阶复杂分析，如针对具备复杂业务逻辑的复杂质检规则等分析需求的模型，支持自定义更细粒度的分析标准，具备更强的多轮上下文建模、深层语义理解与推理能力。",
@@ -44,7 +48,9 @@
           "type": "model-default"
         }
       },
-      "capabilities": ["TG"],
+      "capabilities": [
+        "TG"
+      ],
       "versionTag": "MAJOR",
       "maxOutputTokens": 4096,
       "latestOnlineAt": "2026-01-09T03:31:49.000+00:00",
@@ -64,14 +70,20 @@
           "key": "top_p",
           "default": 0.8,
           "tip": "控制核采样方法的概率阈值，取值越大，生成的随机性越高。",
-          "range": [0.0001, 1]
+          "range": [
+            0.0001,
+            1
+          ]
         },
         {
           "name": "temperature",
           "key": "temperature",
           "default": 0.7,
           "tip": "控制生成随机性和多样性，数值越高多样性越强，数值越低一致性越强，范围(0,2)。建议该参数和top_p只设置1个。",
-          "range": [0, 1.9999]
+          "range": [
+            0,
+            1.9999
+          ]
         }
       ],
       "samples": {

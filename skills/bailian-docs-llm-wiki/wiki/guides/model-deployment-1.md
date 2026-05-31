@@ -1,48 +1,199 @@
 # model deployment 1
 
-阿里云百炼平台支持将基础模型及[[模型调优]]后的自定义模型部署为独立、资源专享的推理服务，满足高并发、低延迟及私有化计算需求。平台提供预置吞吐（PTU）、模型单元（MU）及 Token 按量等多种部署方案，开发者可通过控制台、HTTP API 或 SDK 完成服务的创建、监控与调用。
+百炼平台的模型部署功能允许开发者将预置模型或经过 [[model-training-overview]] 的自定义模型部署为独立的、资源专享的推理服务，以满足高并发、低延迟等业务需求。部署流程涵盖模型导入、服务创建、推理调用和服务管理等环节，支持多种计费方式和模型类型。本文汇总了模型部署相关的核心概念、操作步骤和注意事项。
 
-## 支持的模型与计费模式
-平台支持千问系列、DeepSeek、GLM 及多模态（VL/Omni）等预置模型的独立部署，同时支持导入[[OSS 存储]]中的自定义 LoRA 权重进行专属服务化。不同模型支持的计费与性能模式如下：
+## 支持的模型
 
-- **PTU（预置吞吐）**：保障固定输入/输出 TPM，适合流量稳定的高负载生产环境。超出阈值后自动切换至公共按量服务。
-- **MU（模型单元）**：按算力单元数量与时长计费，资源独占。支持自定义 RPM/TPM 限流、最长上下文长度、推理模式（Instruct/Thinking）及 PD 分离架构以降低首字延迟。
-- **Token 按量（Lora 专属）**：仅适用于完成 SFT 高效微调的模型，按实际调用 Token 量计费，连续 30 天无调用将自动释放实例。
-- **CU（计算单元）**：适用于图像/视频生成类模型，按独占实例时长计费。
+### 可部署的预置模型
 
-> 详细定价表与规格说明请参考 [模型部署简介](../../raw/model-user-guide/model-deployment-1/model-deployment-introduction.md)。
+根据 [模型部署简介](../../raw/model-user-guide/model-deployment-1/model-deployment-introduction.md)，平台支持部署以下系列的预置模型：
 
-## 关键配置参数
-部署与调用时需关注以下核心参数：
+- **千问系列**：千问3.7-Max、千问3.6-Flash/Plus、千问3.5-Plus、千问3-Max、千问-Flash、千问-Plus 等
+- **DeepSeek 系列**：DeepSeek-v4-Pro/Flash、DeepSeek-v3.2、DeepSeek-v3
+- **千问 VL（视觉语言）系列**：千问3-VL-Plus、千问3-VL-8B/32B/235B 等
+- **千问 Omni 系列**：千问3.5-Omni-Flash/Plus
+- **其他模型**：GLM-5/4.7、MiniMax-M2.5、Kimi-K2.5 等
+- **图片/视频生成**：万相文生图、悦动人像 EMO、舞动人像 AnimateAnyone 等
+- **语音合成**：CosyVoice-v3-flash
 
-| 参数 | 说明 | 适用场景 |
-|---|---|---|
-| `model_name` | 待部署模型的 Code 或自定义模型 ID | 所有部署计划 |
-| `plan` | 计费模式：`ptu` \| `mu` \| `lora` \| `cu` | 所有部署请求 |
-| `ptu_capacity` | `{input_tpm: int, output_tpm: int}` | PTU 模式 |
-| `deploy_spec` / `capacity` | MU 规格标识与实例数量 / Lora 容量占位符 | MU / Lora 模式 |
-| `enable_thinking` | `true`/`false`，控制是否启用深度思考推理 | MU / 调用请求 |
-| `max_context_length` | 限制单次对话最大上下文 Token 数 | 部分 MU 模式 |
-| `model` | 调用时使用的专属服务 ID（即 `deployed_model`） | 推理调用 |
+### 可导入的 LoRA 模型
 
-**推理参数对齐建议**：为确保平台输出与本地 vLLM 环境一致，建议在调用时显式设置：`temperature=1.0`, `top_p=1.0`, `top_k=99`, `presence_penalty=0`, `repetition_penalty=1.0`（DashScope 协议）。
+根据 [模型导入](../../raw/model-user-guide/model-deployment-1/model-import.md)，当前支持从 OSS 导入以下基础模型的 LoRA 微调版本：
 
-## 使用方式
-完整工作流包含导入、部署、调用与清理，具体步骤如下：
+| 模型系列 | 模型名称 |
+|---------|---------|
+| 千问3 | 千问3-32B、千问3-14B、千问3-8B、千问3-4B-Instruct-2507 |
+| 千问3-VL | 千问3-VL-8B-Instruct |
+| 千问2.5 | 千问2.5-72B/32B/14B/7B-Instruct |
+| 千问2.5-VL | 千问2.5-VL-72B/7B-Instruct |
 
-1. **导入自定义权重**：将包含 `adapter_model.safetensors` 与 `adapter_config.json` 的 LoRA 目录上传至子目录，完成标签授权后在控制台执行导入。流程详见 [模型导入](../../raw/model-user-guide/model-deployment-1/model-import.md)。
-2. **发起部署**：通过控制台可视化表单或 HTTP API (`POST /api/v1/deployments`) 提交任务。部署成功后即开始计费，无论是否产生调用。
-3. **状态轮询**：调用 `GET /api/v1/deployments/{deploy_id}` 检查 `status`，当返回 `RUNNING` 时表示服务可用。
-4. **推理调用**：使用 DashScope SDK 或 [[openai-compatible-api|OpenAI 兼容接口]]发起请求。`model` 参数必须填入部署返回的专属服务 ID。示例代码见 [使用 API或命令行进行模型部署](../../raw/model-user-guide/model-deployment-1/model-deployment-quick-start.md)。
-5. **服务下线**：调用 `DELETE` 接口立即终止实例并停止计费，该操作不可逆。
+> **注意**：当前仅支持导入 LoRA 模型，不支持导入全参微调模型。
 
-## 限制与注意事项
-- **权限隔离**：API Key 所属的[[业务空间]]必须显式开启目标模型的部署权限。子账号需主账号授予服务关联角色创建权限后方可执行首次授权。
-- **参数无效声明**：`lora` 计划部署请求中 `capacity` 参数为必填但实际无效。如需动态扩缩容，需在控制台提交工单申请，API 直接修改不生效。
-- **文件强校验**：LoRA 导入严格校验 `rank` 值（仅限 8/16/32/64 且全层一致）。禁止训练过程中修改基础模型的 `vocab` 与 `chat_template`。视觉语言模型（VL）的 Adapter 中严禁包含 `visual` 开头的权重，否则导入失败。
-- **计费策略锁定**：部署创建后计费模式不可变更。如需切换计费方案，必须下线现有部署并重新创建。
+## 计费方式
 
-> **注意**：PTU 模式下若单位时间内调用量超出购买的 TPM 配额，系统会自动将超额请求降级至公共[[模型调用]]通道。此时推理性能可能波动，限流受全局策略管控，且响应 Header 中将携带 `x-dashscope-ptu-overflow: true`。建议结合[[模型监控]]面板观察实际吞吐水位，必要时提前扩容。
+平台提供四种计费方式，创建后**不可更改**，需下线重新部署才能切换：
+
+| 计费方式 | 适用场景 | 特点 |
+|---------|---------|------|
+| **预置吞吐（PTU）** | 高负载生产环境，需要稳定吞吐保障 | 按使用时长 × TPM 计费；TPS 通常提升 1.5~2.0 倍；超出购买量自动降级为按量付费 |
+| **模型单元（MU）** | 需自定义性能指标，资源独占 | 按使用时长 × 单元数量计费；支持 [[pd-separation]] 分离模式；支持包月 |
+| **Token 用量** | 调优后模型效果验证 | 按实际 Token 消耗计费，不使用不计费；仅支持部分 LoRA 调优后模型 |
+| **算力单元（CU）** | 图片/视频生成模型 | 按实例占用时长计费 |
+
+费用计算公式：
+- PTU：`费用 = 使用时长 × (输入 TPM 单价 × 输入 TPM + 输出 TPM 单价 × 输出 TPM)`
+- MU：`费用 = 使用时长(小时) × 模型单元数量 × 模型单元单价`
+- Token：`费用 = 输入 Token 数 × 输入单价 + 输出 Token 数 × 输出单价`
+
+## 模型导入流程
+
+从 OSS 导入 LoRA 模型的前置条件和步骤：
+
+### 前置条件
+
+1. 已创建 OSS Bucket 并添加 `bailian-datahub-access` 标签（标签值为 `read`）
+2. 不支持归档、冷归档或深度冷归档存储类型
+3. 不支持访问 Bucket 根目录下的文件，需放在子目录中
+4. 首次导入需完成 OSS 服务关联角色授权
+
+### 模型文件要求
+
+- **必需文件**：`adapter_model.safetensors`（权重文件）和 `adapter_config.json`（配置文件）
+- **rank 参数**：必须为 8、16、32 或 64 之一，所有 LoRA 层需使用相同 rank 值
+- **词汇表**：不可修改，必须与基础模型一致
+- **chat_template**：不可修改，必须与基础模型默认配置一致
+- **VL 模型**：必须冻结 VIT 部分，adapter 中不能包含 `visual` 相关权重
+
+## 使用 API 部署模型
+
+根据 [使用 API或命令行进行模型部署](../../raw/model-user-guide/model-deployment-1/model-deployment-quick-start.md)，API 部署的完整流程如下：
+
+### 前提条件
+
+- 已获取 [[api-key]] 并配置到环境变量 `DASHSCOPE_API_KEY`
+- API Key 所在业务空间拥有模型部署权限
+
+### 1. 创建部署
+
+API 端点：`POST https://dashscope.aliyuncs.com/api/v1/deployments`
+
+不同计费方式的请求示例：
+
+**PTU 模式：**
+```bash
+curl "https://dashscope.aliyuncs.com/api/v1/deployments" \
+--header "Authorization: Bearer $DASHSCOPE_API_KEY" \
+--header 'Content-Type: application/json' \
+--data '{
+    "name": "my_qwen_flash",
+    "model_name": "qwen-flash-2025-07-28",
+    "plan": "ptu",
+    "ptu_capacity": {
+        "input_tpm": 10000,
+        "output_tpm": 1000
+    }
+}'
+```
+
+**MU 模式：**
+```bash
+curl "https://dashscope.aliyuncs.com/api/v1/deployments" \
+--header "Authorization: Bearer $DASHSCOPE_API_KEY" \
+--header 'Content-Type: application/json' \
+--data '{
+    "name": "my_qwen_plus",
+    "model_name": "qwen-plus-2025-12-01",
+    "plan": "mu",
+    "deploy_spec": "MU1",
+    "enable_thinking": true,
+    "capacity": 4,
+    "max_context_length": 10000,
+    "rpm_limit": 500,
+    "tpm_limit": 1000
+}'
+```
+
+**Token 用量（LoRA）模式：**
+```bash
+curl "https://dashscope.aliyuncs.com/api/v1/deployments" \
+--header "Authorization: Bearer $DASHSCOPE_API_KEY" \
+--header 'Content-Type: application/json' \
+--data '{
+    "model_name": "qwen3-8b-ft-202511132025-0260",
+    "plan": "lora",
+    "capacity": 1,
+    "name": "qwen3-8b-ft"
+}'
+```
+
+> **注意**：LoRA 模式下 `capacity` 参数设置无效但必须填写。扩缩容需在控制台提交申请。
+
+### 2. 查询状态
+
+```bash
+curl "https://dashscope.aliyuncs.com/api/v1/deployments/{deployed_model}" \
+    --header "Authorization: Bearer $DASHSCOPE_API_KEY"
+```
+
+当返回 `"status": "RUNNING"` 时，部署完成。
+
+### 3. 调用推理
+
+```python
+from dashscope import Generation
+response = Generation.call(
+    model='qwen3-8b',
+    [[prompt|prompt]]='你是谁？',
+    enable_thinking=False,
+    api_key=os.getenv('DASHSCOPE_API_KEY'),
+)
+```
+
+部署后支持通过 [[openai-compatible-api]]、[[dashscope-api]] 及 [[assistant-sdk]] 进行调用。调用时 `model` 参数取值为部署后的模型 `code`。
+
+### 4. 删除服务
+
+```bash
+curl --request DELETE \
+  'https://dashscope.aliyuncs.com/api/v1/deployments/{deployed_model}' \
+    --header "Authorization: Bearer $DASHSCOPE_API_KEY"
+```
+
+删除后不可恢复，服务立即停止计费。
+
+## 关键参数说明
+
+### MU 模式部署配置
+
+| 配置项 | 说明 |
+|-------|------|
+| `enable_thinking` | 推理模式：`true` 为思考模式（Thinking），`false` 为非思考模式（Instruct） |
+| `max_context_length` | 最长上下文长度，基于模型类型 |
+| `rpm_limit` / `tpm_limit` | 服务限流配置 |
+| `deploy_spec` | 模型单元规格（如 MU1-MU9） |
+
+### 推理参数对齐（导入模型适用）
+
+导入的模型推理效果可能与本地 vLLM/SGLang 不一致，建议调整以下参数：
+
+| 参数 | vLLM 默认值对应 |
+|-----|---------------|
+| `temperature` | 1.0 |
+| `top_p` | 1.0 |
+| `top_k` | None 或 >100（不启用） |
+| `presence_penalty` | 0 |
+| `repetition_penalty` | 1.0 |
+
+## 限制和注意事项
+
+- **地域限制**：本功能仅适用于中国大陆版（北京地域）
+- **计费即时性**：PTU、MU、CU 模式部署成功后即开始计费，即使未调用模型
+- **Token 用量模式**：一个月内不使用将自动释放
+- **PTU 溢出**：超出购买吞吐量时自动降级为按量付费，API 返回 Header 包含 `x-dashscope-ptu-overflow:true`
+- **MU 后付费**：算力资源先到先得，购买不成功全额退款
+- **预付费退订**：MU 包月首月内提前退订，日单价按 1.2 倍计费；PTU 预付费无法提前终止
+- **权限问题**：API 调用需确保 API Key 归属业务空间拥有部署权限，且账号在该空间有操作权限
+- **欠费处理**：后付费账户欠费后资源保留 24 小时后自动释放
 
 ## 来源文档
 
