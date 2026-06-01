@@ -64,21 +64,21 @@
 
 ## 横切概念
 
-- [多轮对话与上下文管理](concepts/multi-turn-conversation.md) — 关联 6 个主题
-- [函数调用（工具调用）](concepts/function-calling.md) — 关联 8 个主题
-- [检索增强生成（RAG）](concepts/rag.md) — 关联 7 个主题
+- [多轮对话](concepts/multi-turn-conversation.md) — 关联 6 个主题
+- [函数调用](concepts/function-calling.md) — 关联 7 个主题
+- [检索增强生成](concepts/rag.md) — 关联 7 个主题
 - [流式输出](concepts/streaming.md) — 关联 6 个主题
-- [异步任务调用](concepts/async-task.md) — 关联 5 个主题
-- [API Key 管理与安全](concepts/api-key.md) — 关联 6 个主题
+- [异步任务](concepts/async-task.md) — 关联 6 个主题
+- [API Key 管理](concepts/api-key.md) — 关联 7 个主题
 - [OpenAI 兼容接口](concepts/openai-compatible-api.md) — 关联 7 个主题
-- [Token 计量与计费](concepts/token.md) — 关联 7 个主题
+- [Token](concepts/token.md) — 关联 6 个主题
 
 ## 对比分析
 
-- [模型监控与应用监控对比](comparisons/model-vs-application-monitoring.md) — 对比 2 个主题
-- [模型评估与应用评估对比](comparisons/model-vs-application-evaluation.md) — 对比 2 个主题
-- [模型微调与模型训练对比](comparisons/fine-tuning-vs-model-training.md) — 对比 2 个主题
+- [模型监控与应用监控对比](comparisons/model-monitoring-vs-application-monitoring.md) — 对比 2 个主题
+- [模型评估与应用评估对比](comparisons/model-evaluation-vs-application-evaluation.md) — 对比 2 个主题
+- [模型微调、模型训练与模型部署对比](comparisons/fine-tuning-vs-model-training-vs-model-deployment.md) — 对比 3 个主题
 - [图像生成、视频生成与3D生成对比](comparisons/image-vs-video-vs-3d-generation.md) — 对比 3 个主题
 - [文本Embedding与多模态向量对比](comparisons/text-embedding-vs-multimodal-vector.md) — 对比 2 个主题
-- [语音合成、语音识别与语音翻译对比](comparisons/speech-synthesis-vs-recognition-vs-translation.md) — 对比 3 个主题
+- [语音合成、语音识别与语音翻译对比](comparisons/speech-synth-vs-recognition-vs-translation.md) — 对比 3 个主题
 

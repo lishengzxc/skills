@@ -1,111 +1,87 @@
 # 流式输出
 
-流式输出（Streaming）是指服务端在生成完整响应之前，将结果以增量片段的形式逐步返回给客户端的数据传输模式。相比非流式调用需要等待全部内容生成完毕后一次性返回，流式输出可显著降低首字（首包）延迟，提升用户感知的响应速度。
+流式输出（Streaming）是指模型在生成过程中将结果以增量片段（chunk/delta）逐步返回给客户端的输出方式，而非等待全部内容生成完毕后一次性返回。这种方式可显著降低首token延迟，提升用户的实时交互体验。
 
-## 适用场景
+## 概述
 
-在百炼平台中，流式输出广泛应用于以下场景：
+在百炼平台中，流式输出广泛应用于文本生成、语音合成、实时翻译、应用调用等多种场景。根据底层协议的不同，流式输出主要通过两种机制实现：
 
-| 场景 | 说明 |
-|------|------|
-| **文本生成（LLM 对话）** | 模型逐 token 输出文本，实现"打字机"效果 |
-| **应用调用（智能体/工作流）** | 智能体和工作流应用的对话响应逐步返回 |
-| **语音合成（TTS）** | 实时合成场景下音频数据分片返回，边合成边播放 |
-| **音乐生成** | 音频片段以 Base64 编码逐段返回，无需等待完整歌曲生成 |
-| **实时多模态交互** | WebSocket 双向通信本身即为流式架构，音频/文本持续推送 |
+| 协议 | 机制 | 典型场景 |
+|------|------|----------|
+| HTTP | Server-Sent Events (SSE) | 文本生成、离线翻译、应用调用 |
+| WebSocket | 双向流式通信 | 实时语音合成、实时翻译、多模态实时交互 |
 
-## 启用方式
+## 在不同场景中的使用
 
-不同 API 体系的流式输出启用方式有所差异：
+### 文本生成模型
 
-### 文本生成与应用调用
+通过 [OpenAI 兼容接口](openai-compatible-api.md)或 DashScope 接口调用 Qwen 系列模型时，设置 `stream=True` 即可启用流式输出。响应以 SSE 格式逐步返回增量文本内容。
 
-| API 体系 | 启用方式 | 传输协议 |
-|----------|----------|----------|
-| DashScope SDK（Python） | `stream=True` | SSE |
-| DashScope SDK（Java） | `streamCall()` 方法 | SSE |
-| DashScope HTTP | 请求头 `X-DashScope-SSE: enable` | SSE |
-| [[openai-compatible-api|OpenAI 兼容接口]] | `stream=true` | SSE |
+### 应用调用
 
-**DashScope SDK 示例（Python）：**
+智能体应用和工作流应用均支持流式输出。在 DashScope API 和 OpenAI 兼容 Responses API 中，通过 `stream` 参数控制：
 
 ```python
-import os
-from dashscope import Application
-
-responses = Application.call(
-    api_key=os.getenv("DASHSCOPE_API_KEY"),
+# DashScope SDK
+response = Application.call(
     app_id='YOUR_APP_ID',
-    [[prompt|prompt]]='请介绍量子计算',
+    prompt='你好',
     stream=True  # 启用流式输出
 )
-for response in responses:
-    print(response.output.text, end='', flush=True)
+for chunk in response:
+    print(chunk.output.text, end='')
 ```
 
-**HTTP 示例（curl）：**
+### 语音/音视频翻译
 
-```bash
-curl -X POST 'https://dashscope.aliyuncs.com/api/v1/apps/{APP_ID}/completion' \
-  -H "Authorization: Bearer $DASHSCOPE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -H "X-DashScope-SSE: enable" \
-  -d '{"input": {"[[prompt|prompt]]": "请介绍量子计算"}}'
-```
+离线翻译接口（qwen3-livetranslate-flash）**必须**设置 `stream=True`，不支持非流式调用。流式响应包含三类 chunk：
 
-### 音乐生成
+- **文本 chunk**：`choices[0].delta.content` 包含增量翻译文本
+- **音频 chunk**：`choices[0].delta.audio.data` 包含 Base64 编码的音频数据
+- **[Token](token.md) 消耗 chunk**：`usage` 字段包含 token 统计信息
 
-通过 HTTP 请求头启用 SSE 流式输出：
+### 语音合成
 
-```
-X-DashScope-SSE: enable
-```
-
-流式响应中，中间消息的 `output.audio.data` 包含 Base64 编码的音频片段（`finish_reason` 为 `null`），最终消息包含完整音频 URL 和元信息（`finish_reason` 为 `stop`）。
-
-### 语音合成（实时）
-
-实时 TTS 通过 WebSocket 协议天然支持流式输出，音频数据以分片形式持续推送：
-
-- **CosyVoice 实时**：`run-task` → `continue-task` → `finish-task` 交互流程
-- **Qwen-TTS 实时**：`session.update` → `input_text_buffer.append` → `input_text_buffer.commit` 交互流程
-- **Sambert**：仅支持单向流式输出（`streaming: "out"`）
+实时语音合成（如 Qwen-TTS Realtime、CosyVoice）通过 WebSocket 实现双向流式通信——客户端可流式发送待合成文本，服务端流式返回音频数据。
 
 ### 实时多模态交互
 
-[[omni-realtime-api]] 基于 WebSocket 双向流式通信，音频和文本响应通过服务端事件持续推送，无需额外配置流式参数。
+Qwen-Omni-Realtime API 基于 WebSocket 协议实现全双工流式通信，服务端通过 delta 事件逐步推送结果：
 
-## 关键参数与配置
+| 事件 | 内容 |
+|------|------|
+| `response.text.delta` | 增量文本输出 |
+| `response.audio.delta` | 增量音频输出 |
+| `response.audio_transcript.delta` | 模型输出的转录文本 |
+| `response.function_call_arguments.delta` | 工具调用参数增量 |
 
-| 参数/配置 | 适用范围 | 说明 |
-|-----------|----------|------|
-| `stream` | SDK 调用 | 设为 `True`/`true` 启用流式 |
-| `X-DashScope-SSE` | HTTP 调用 | 设为 `enable` 启用 SSE 流式 |
-| `incremental_output` | 文本生成（部分接口） | 设为 `true` 时每次仅返回增量内容，否则返回累积内容 |
-| `streaming` | 语音合成 WebSocket | 如 `"out"` 表示仅输出流式 |
+## 关键参数和配置
 
-## 注意事项
+### HTTP 流式（SSE）
 
-- **工作流应用的额外配置**：工作流应用使用流式输出时，需在百炼控制台的**结束节点**或**流程输出节点**中启用「流式输出」开关，并**重新发布**应用后才能生效。
-- **SSE 数据格式**：HTTP 流式响应遵循 Server-Sent Events 规范，每条消息以 `data:` 前缀发送，消息之间以空行分隔。客户端需按 SSE 协议逐条解析。
-- **错误处理**：流式传输过程中若发生错误，错误信息将以最后一条 SSE 事件的形式返回，客户端应监听错误事件并妥善处理。
-- **非流式与流式字符限制可能不同**：如 [[music-generation-references]] 中，流式模式下的歌词字符要求（中文 300~350 字）比非流式模式（中文 5~350 字符）更严格。
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `stream` | boolean | `false` | 设为 `true` 启用流式输出 |
+| `stream_options` | object | — | 部分接口支持，如设置是否在最后一个 chunk 中返回 `usage` |
 
-## 相关主题
+### WebSocket 流式
 
-- [[qwen-api-reference]] — 文本生成模型 API 接口总览
-- [[application-call]] — 应用调用 API 参考
-- [[bailian-application-calling]] — 应用调用实践指南
-- [[speech-synthesis-api-reference]] — 语音合成 API 参考
-- [[music-generation-references]] — 音乐生成 API 参考
-- [[omni-realtime-api]] — 实时多模态交互 API 参考
+WebSocket 场景无需显式设置 `stream` 参数，连接建立后即为双向流式通信模式。服务端通过带 `delta` 后缀的事件推送增量数据，以 `done` 后缀的事件标识某项输出完成。
+
+## 开发注意事项
+
+1. **部分接口强制要求流式**：如离线翻译接口必须设置 `stream=True`，不支持同步返回完整结果。
+2. **增量拼接**：客户端需自行拼接各 chunk 中的增量内容以获取完整输出。
+3. **错误处理**：流式过程中如发生错误，服务端会通过 `error` 事件或特定格式的 chunk 通知客户端，需做好中断处理。
+4. **工作流应用的流式输出**：工作流应用启用流式时，可能按节点逐步返回中间结果，具体行为取决于工作流编排结构。
+5. **连接管理**：WebSocket 流式场景需关注连接保活和断线重连策略。
 
 ## 关联主题页
 
-- [[qwen-api-reference|qwen api reference]] — `../api/qwen-api-reference.md`
-- [[application-call|application call]] — `../api/application-call.md`
-- [[bailian-application-calling|bailian [[application-call|application call]]ing]] — `../guides/bailian-application-calling.md`
-- [[omni-realtime-api|omni realtime api]] — `../api/omni-realtime-api.md`
-- [[speech-synthesis-api-reference|speech synthesis api reference]] — `../api/speech-synthesis-api-reference.md`
-- [[music-generation-references|music generation references]] — `../api/music-generation-references.md`
+- [qwen api reference](../api/qwen-api-reference.md)
+- [omni realtime api](../api/omni-realtime-api.md)
+- [speech synthesis api reference](../api/speech-synthesis-api-reference.md)
+- [speech translation api reference](../api/speech-translation-api-reference.md)
+- [bailian application calling](../guides/bailian-application-calling.md)
+- [application call](../api/application-call.md)
 
