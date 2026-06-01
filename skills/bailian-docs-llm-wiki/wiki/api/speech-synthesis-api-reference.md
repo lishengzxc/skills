@@ -1,182 +1,189 @@
 # speech synthesis api reference
 
-百炼平台提供多种语音合成（TTS）模型和接口，支持将文本转换为高质量语音。平台涵盖 Qwen-TTS、CosyVoice、Sambert 和 MiniMax 等模型系列，提供 HTTP API、WebSocket API 以及多语言 SDK（Python、Java、Android、iOS）等接入方式，满足实时与非实时语音合成的不同场景需求。
+百炼平台提供多种语音合成（TTS）API，涵盖 Qwen-TTS、CosyVoice、Sambert 和 MiniMax 等模型系列，支持实时与非实时两种合成模式。本文汇总各模型的接口规格、关键参数和调用方式，帮助开发者快速选型和集成。
 
 ## 支持的模型
 
 ### Qwen-TTS 系列
 
-| 模型 | 场景 | 接口协议 |
-|------|------|----------|
-| qwen3-tts-flash | 非实时合成 | HTTP (MultiModalConversation) |
-| qwen3-tts-instruct-flash | 非实时合成（指令控制） | HTTP (MultiModalConversation) |
-| qwen3-tts-flash-realtime | 实时合成 | WebSocket |
-| qwen3-tts-instruct-flash-realtime | 实时合成（指令控制） | WebSocket |
-| qwen3-tts-vc-realtime | 实时合成（声音复刻音色） | WebSocket |
-| qwen3-tts-vd-realtime | 实时合成（声音设计音色） | WebSocket |
+| 模型 | 模式 | 协议 | 说明 |
+|------|------|------|------|
+| `qwen3-tts-flash` | 非实时 | HTTP | 基础语音合成 |
+| `qwen3-tts-instruct-flash` | 非实时 | HTTP | 支持指令控制（instructions）|
+| `qwen3-tts-flash-realtime` | 实时 | WebSocket | 实时流式合成 |
+| `qwen3-tts-instruct-flash-realtime` | 实时 | WebSocket | 实时 + 指令控制 |
+
+详见 [非实时语音合成（Qwen-TTS）API参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-api.md) 和 [Qwen-TTS-Realtime WebSocket API 参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/interactive-process-of-qwen-tts-realtime-synthesis.md)。
 
 ### CosyVoice 系列
 
-| 模型 | 场景 | 接口协议 |
-|------|------|----------|
-| cosyvoice-v3.5-plus | 实时/非实时 | WebSocket / HTTP |
-| cosyvoice-v3.5-flash | 实时/非实时 | WebSocket / HTTP |
-| cosyvoice-v3-plus | 实时/非实时 | WebSocket / HTTP |
-| cosyvoice-v3-flash | 实时/非实时 | WebSocket / HTTP |
-| cosyvoice-v2 | 实时/非实时 | WebSocket / HTTP |
+| 模型 | 协议 | 备注 |
+|------|------|------|
+| `cosyvoice-v3.5-plus` | WebSocket / HTTP | 最新版本 |
+| `cosyvoice-v3.5-flash` | WebSocket / HTTP | 低延迟版 |
+| `cosyvoice-v3-plus` | WebSocket / HTTP | — |
+| `cosyvoice-v3-flash` | WebSocket / HTTP | — |
+| `cosyvoice-v2` | WebSocket / HTTP | — |
+
+CosyVoice 同时支持实时（WebSocket 双向流式）和非实时（HTTP）两种调用方式。非实时 HTTP 方式仅在中国内地（北京地域）可用。
 
 ### Sambert 系列
 
-Sambert 模型（如 `sambert-zhichu-v1`）仅支持在北京地域使用，不支持流式输入（所有文本需一次性提交）。
+Sambert 模型（如 `sambert-zhichu-v1`）仅支持在北京地域使用，且不支持流式文本输入——所有待合成文本必须在 `run-task` 事件中一次性发送。
 
 ### MiniMax 系列
 
-| 模型 | 说明 |
-|------|------|
-| MiniMax/speech-2.8-hd | 高清音质 |
-| MiniMax/speech-02-hd | 高清音质 |
-| MiniMax/speech-2.8-turbo | 低延迟 |
-| MiniMax/speech-02-turbo | 低延迟 |
+| 模型 | 单价（每万字符）|
+|------|----------------|
+| `MiniMax/speech-2.8-hd` | 3.5 元 |
+| `MiniMax/speech-02-hd` | 3.5 元 |
+| `MiniMax/speech-2.8-turbo` | 2 元 |
+| `MiniMax/speech-02-turbo` | 2 元 |
 
-## 接入方式
+## 服务端点
 
-### HTTP API
+### HTTP 端点
 
-适用于非实时合成场景。根据模型不同，端点有所区别：
+| 部署范围 | URL |
+|---------|-----|
+| 中国内地（北京）| `https://dashscope.aliyuncs.com/api/v1` |
+| 国际（新加坡）| `https://dashscope-intl.aliyuncs.com/api/v1` |
 
-- **Qwen-TTS 非实时**：通过 `MultiModalConversation` 接口调用，详见 [非实时语音合成（Qwen-TTS）API参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-api.md)
-- **CosyVoice 非实时**：`POST https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer`，详见 [非实时语音合成CosyVoice HTTP API参考](../../raw/model-api-reference/speech-synthesis-api-reference/non-realtime-cosyvoice-api/cosyvoice-tts-http-api.md)
-- **MiniMax**：`POST https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
+### WebSocket 端点
 
-> **注意**：CosyVoice 非实时 HTTP API 仅在中国内地部署范围（北京地域）下可用。
+| 模型系列 | 中国内地 | 国际 |
+|---------|---------|------|
+| CosyVoice / Sambert | `wss://dashscope.aliyuncs.com/api-ws/v1/inference` | `wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference` |
+| Qwen-TTS Realtime | `wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model=<model>` | `wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime?model=<model>` |
 
-### WebSocket API
-
-适用于实时合成场景，支持双向流式交互：
-
-- **CosyVoice 实时**：`wss://dashscope.aliyuncs.com/api-ws/v1/inference`，采用 `run-task` → `continue-task` → `finish-task` 交互流程
-- **Qwen-TTS 实时**：`wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model=<model_name>`，采用 `session.update` → `input_text_buffer.append` → `input_text_buffer.commit` 交互流程，详见 [Qwen-TTS-Realtime WebSocket API 参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/interactive-process-of-qwen-tts-realtime-synthesis.md)
-- **Sambert**：`wss://dashscope.aliyuncs.com/api-ws/v1/inference`，仅支持单向[[streaming|流式输出]]（`streaming: "out"`）
-
-### SDK 支持
-
-| SDK | CosyVoice 实时 | CosyVoice 非实时 | Qwen-TTS 实时 | Qwen-TTS 非实时 | Sambert |
-|-----|-------|-------|-------|-------|---------|
-| Python | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Java | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Android | ✅ | - | - | - | ✅ |
-| iOS | ✅ | - | - | - | ✅ |
+> **注意**：Sambert 仅支持北京地域的 WebSocket 端点，不支持国际地域。不同地域的 API Key 不同，请确保使用对应地域的 Key。
 
 ## 关键参数
 
 ### 通用音频参数
 
-| 参数 | 说明 | CosyVoice | Qwen-TTS Realtime | Sambert |
-|------|------|-----------|-------------------|---------|
-| format | 音频格式 | pcm/wav/mp3/opus | pcm/wav/mp3/opus | pcm/wav/mp3 |
-| sample_rate | 采样率(Hz) | 8000-48000，默认22050 | 8000/16000/24000(默认)/48000 | 8000-24000，默认16000 |
-| volume | 音量 | [0,100]，默认50 | [0,100]，默认50 | [0,100]，默认50 |
-| rate/speech_rate | 语速 | [0.5,2.0]，默认1.0 | [0.5,2.0]，默认1.0 | [0.5,2.0]，默认1.0 |
-| pitch | 音调 | [0.5,2.0]，默认1.0 | - | [0.5,2.0]，默认1.0 |
+以下参数在大多数模型中通用，但取值范围和默认值因模型而异：
 
-> **注意**：`cosyvoice-v1` 不支持 opus 格式和 seed 参数。Qwen-TTS-Realtime 的旧版模型（qwen-tts-realtime）仅支持 pcm 格式和 24000 采样率。
+| 参数 | 类型 | 说明 | CosyVoice 默认值 | Qwen-TTS Realtime 默认值 | Sambert 默认值 |
+|------|------|------|-----------------|------------------------|--------------|
+| `voice` | string | 音色标识（必选）| — | Cherry | — |
+| `format` | string | 音频格式 | mp3 | pcm | wav |
+| `sample_rate` | integer | 采样率 (Hz) | 22050 | 24000 | 16000 |
+| `volume` | integer | 音量 [0, 100] | 50 | 50 | 50 |
+| `rate` / `speech_rate` | float | 语速 [0.5, 2.0] | 1.0 | 1.0 | 1.0 |
+| `pitch` / `pitch_rate` | float | 音调 [0.5, 2.0] | 1.0 | — | 1.0 |
 
-### 音色（voice）
+> **注意**：CosyVoice 的 `cosyvoice-v1` 模型不支持 `opus` 格式和 `seed` 参数。Qwen-TTS Realtime 的早期模型（`qwen-tts-realtime`）仅支持 `pcm` 格式和 24000 采样率。
 
-音色来源包括：
-- **系统音色**：各模型预置音色，参见 [[cosyvoice-voice-list]]
-- **声音复刻音色**：通过上传音频创建自定义音色，参见 [[voice-clone-design-http-api]]
-- **声音设计音色**：通过文本描述生成音色，参见 [[voice-design-api-references]]
+### 音色相关
 
-每个模型仅支持一组特定音色，不能跨模型混用。复刻/设计音色时 `target_model` 必须与后续合成使用的模型一致。
+所有模型都支持系统预置音色。此外还可通过以下方式获取专属音色：
 
-### 文本输入限制
+- **声音复刻**：上传音频样本创建音色，详见 [声音复刻HTTP API参考](../../raw/model-api-reference/speech-synthesis-api-reference/sound-reengraving/voice-clone-design-http-api.md)
+- **声音设计**：通过文本描述生成音色（支持 CosyVoice 和 Qwen 两种声音设计模型）
 
-| 接口 | 单次文本限制 | 累计限制 |
-|------|-------------|---------|
-| CosyVoice 非流式 | 20000 字符 | - |
-| CosyVoice 流式 | 单次 20000 字符 | 累计 20万字符 |
-| Qwen-TTS Realtime | 通过 append 分段提交 | - |
-| Sambert | 一次性提交 | - |
-| MiniMax | 10000 字符 | - |
+每个模型仅支持一组特定的音色，不能跨模型混用。创建音色时的 `target_model` 必须与后续语音合成时使用的模型一致。
 
-### 特色功能参数
+### Qwen-TTS Realtime 交互模式
 
-- **SSML**：CosyVoice 支持，需设置 `enable_ssml: true`，开启后仅允许发送一次 `continue-task`
-- **Instruct**：CosyVoice 部分音色支持通过 `instruction` 参数控制情感/场景
-- **字级别时间戳**：CosyVoice 和 Sambert 支持，通过 `word_timestamp_enabled` 开启
-- **音素时间戳**：仅 Sambert 支持，通过 `phoneme_timestamp_enabled` 开启
-- **指令控制**（Qwen-TTS）：使用 `qwen3-tts-instruct-flash` 模型，通过 `instructions` 参数描述语音风格
-- **seed**：CosyVoice 随机种子，相同参数+seed 可复现合成结果，范围 [0, 65535]
+Qwen-TTS Realtime 支持两种交互模式：
 
-## 交互模式
+- **`server_commit`**（默认）：服务端自动判断文本分段与合成时机，平衡延迟与质量
+- **`commit`**：客户端手动控制合成触发，延迟最低，需自行管理句子完整性
 
-### CosyVoice WebSocket
+## 调用方式
 
-1. 建立连接 → 2. `run-task`（设置参数）→ 3. 收到 `task-started` → 4. 多次 `continue-task`（发送文本）→ 5. 收到 `result-generated` + binary 音频 → 6. `finish-task` → 7. 收到 `task-finished`
+### SDK 支持矩阵
 
-同一任务中所有事件必须使用相同的 `task_id`（UUID 格式）。建议复用 WebSocket 连接处理多个任务。
+| 模型系列 | Python SDK | Java SDK | Android SDK | iOS SDK | HTTP API | WebSocket |
+|---------|-----------|---------|------------|---------|---------|-----------|
+| Qwen-TTS（非实时）| ✅ | ✅ | — | — | ✅ | — |
+| Qwen-TTS Realtime | ✅ | ✅ | — | — | — | ✅ |
+| CosyVoice（实时）| ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| CosyVoice（非实时）| ✅ | ✅ | — | — | ✅ | — |
+| Sambert | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| MiniMax | ✅ | ✅ | — | — | ✅ | — |
 
-### Qwen-TTS Realtime WebSocket
+### CosyVoice WebSocket 交互流程
 
-支持两种模式：
-- **server_commit**（默认）：服务端自动判断合成时机
-- **commit**：客户端通过 `input_text_buffer.commit` 手动触发
+1. 建立 WebSocket 连接
+2. 发送 `run-task` 事件（设置模型、音色等参数）
+3. 收到 `task-started` 后，通过 `continue-task` 发送文本片段
+4. 通过 binary 通道接收音频流，同时接收 `result-generated` 事件
+5. 文本发送完毕后发送 `finish-task`
+6. 收到 `task-finished` 后关闭或复用连接
 
-流程：连接 → `session.created` → `session.update` → 多次 `input_text_buffer.append` → `input_text_buffer.commit`（或自动触发）→ `response.audio.delta`（base64 音频）→ `session.finish`
+同一次任务中 `run-task`、`continue-task`、`finish-task` 必须使用相同的 `task_id`。建议复用 WebSocket 连接处理多个任务。
 
-## 服务地域
+### Qwen-TTS Realtime WebSocket 交互流程
 
-| 地域 | HTTP 端点 | WebSocket 端点 |
-|------|-----------|---------------|
-| 中国内地（北京） | `https://dashscope.aliyuncs.com/api/v1` | `wss://dashscope.aliyuncs.com/api-ws/v1/inference` |
-| 国际（新加坡） | `https://dashscope-intl.aliyuncs.com/api/v1` | `wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference` |
+1. 连接后收到 `session.created`
+2. 发送 `session.update` 配置音色、格式等
+3. 通过 `input_text_buffer.append` 添加文本
+4. 通过 `input_text_buffer.commit`（commit 模式）或自动触发（server_commit 模式）合成
+5. 接收 `response.audio.delta`（base64 编码音频）
+6. 发送 `session.finish` 结束会话
 
-> **注意**：不同地域的 API Key 不通用，请确保使用对应地域的 Key。Sambert 仅支持北京地域。
+### SDK 最低版本要求
 
-## 鉴权
+| SDK | 最低版本 |
+|-----|---------|
+| DashScope Python | ≥ 1.25.11（Realtime）/ ≥ 1.25.17（非实时 CosyVoice）|
+| DashScope Java | ≥ 2.22.7（Realtime）/ ≥ 2.22.15（非实时 CosyVoice）|
 
-所有接口统一使用 `Authorization: Bearer <your_api_key>` 请求头。WebSocket 鉴权在握手阶段完成，Key 无效时返回 HTTP 401/403。
+## 特性说明
 
-建议在移动端（Android/iOS）使用[[generate-temporary-api-key|临时 API Key]]，默认 60 秒有效期，降低泄露风险。
+### SSML 支持
+
+CosyVoice 和 Sambert 支持 SSML 标记语言。使用时需将 `enable_ssml` 设为 `true`，且仅允许发送一次 `continue-task` 指令（CosyVoice WebSocket 模式下）。
+
+### 字级别时间戳
+
+通过 `word_timestamp_enabled` 参数开启。CosyVoice 仅部分音色支持（需参照音色列表中的标注），Sambert 所有模型均支持。Sambert 还额外支持 `phoneme_timestamp_enabled`（音素级别时间戳）。
+
+### 指令控制（Instruct）
+
+- Qwen-TTS：使用 `qwen3-tts-instruct-flash` 或 `qwen3-tts-instruct-flash-realtime` 模型，通过 `instructions` 参数传入自然语言描述
+- CosyVoice：部分音色支持通过 `instruction` 参数设置情感、场景等
 
 ## 限制和注意事项
 
-- 待合成文本必须在所选音色支持的语言范围内，否则可能出现发音错误
-- CosyVoice `continue-task` 中的文本会被服务端自动分句，完整语句立即合成，不完整语句缓存等待
-- Sambert 不支持 `continue-task` 和 `finish-task`，所有文本必须在 `run-task` 中一次性提交
-- MiniMax 文本超过 3000 字符时推荐使用[[streaming|流式输出]]
-- DashScope Python SDK 中 `SpeechSynthesizer` 接口（用于 Qwen-TTS 非实时）已统一为 `MultiModalConversation`，使用方法和参数保持一致
+- 单次文本长度限制：SDK 调用一般不超过 **20000 字符**，累计不超过 **20 万字符**（CosyVoice 流式）；MiniMax 文本长度限制 **10000 字符**
+- Sambert **不支持流式文本输入**（`streaming` 为 `out` 而非 `duplex`），不支持 `continue-task` 和 `finish-task` 指令
+- CosyVoice 非实时 HTTP API **仅限中国内地（北京地域）** 使用
+- 声音复刻/设计的 `target_model` 必须与语音合成时的 `model` 一致，否则合成将失败
+- WebSocket 鉴权在握手阶段验证，API Key 无效或缺失将返回 HTTP 401/403 错误
+- Qwen-TTS 非实时 API 中，Python SDK 的 `SpeechSynthesizer` 接口已统一为 `MultiModalConversation`，使用方法和参数保持一致
 
 ## 来源文档
 
 - [非实时语音合成（Qwen-TTS）API参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-api.md)
 - [声音设计API参考](../../raw/model-api-reference/speech-synthesis-api-reference/voice-design-api-references.md)
-- [CosyVoice服务端事件](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-server-events.md)
 - [CosyVoice WebSocket API参考](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-websocket-api.md)
+- [CosyVoice服务端事件](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-server-events.md)
 - [CosyVoice客户端事件](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-client-events.md)
-- [实时语音合成CosyVoice Python SDK](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-python-sdk.md)
 - [实时语音合成CosyVoice Java SDK](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-java-sdk.md)
+- [实时语音合成CosyVoice Python SDK](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-python-sdk.md)
 - [语音合成CosyVoice Android SDK](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-android-sdk.md)
 - [语音合成CosyVoice iOS SDK](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-ios-sdk.md)
-- [客户端事件](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-client-events.md)
-- [Qwen-TTS-Realtime WebSocket API 参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/interactive-process-of-qwen-tts-realtime-synthesis.md)
-- [CosyVoice音色列表](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-voice-list.md)
-- [服务端事件](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-server-events.md)
-- [Python SDK](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-python-sdk.md)
-- [Sambert WebSocket API 参考](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-websocket-api.md)
-- [Java SDK](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-java-sdk.md)
 - [Sambert客户端事件](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-client-events.md)
+- [Sambert WebSocket API 参考](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-websocket-api.md)
+- [CosyVoice音色列表](../../raw/model-api-reference/speech-synthesis-api-reference/cosyvoice-large-model-for-speech-synthesis/cosyvoice-voice-list.md)
 - [Sambert服务端事件](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-server-events.md)
 - [语音合成Sambert Java SDK](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-java-sdk.md)
-- [语音合成Sambert Python SDK](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-python-sdk.md)
 - [语音合成Sambert Android SDK](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-android-sdk.md)
+- [语音合成Sambert Python SDK](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-python-sdk.md)
+- [Qwen-TTS-Realtime WebSocket API 参考](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/interactive-process-of-qwen-tts-realtime-synthesis.md)
 - [语音合成Sambert iOS SDK](../../raw/model-api-reference/speech-synthesis-api-reference/sambert-speech-synthesis/sambert-ios-sdk.md)
+- [客户端事件](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-client-events.md)
+- [服务端事件](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-server-events.md)
+- [Python SDK](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-python-sdk.md)
 - [非实时语音合成CosyVoice HTTP API参考](../../raw/model-api-reference/speech-synthesis-api-reference/non-realtime-cosyvoice-api/cosyvoice-tts-http-api.md)
+- [Java SDK](../../raw/model-api-reference/speech-synthesis-api-reference/qwen-tts-realtime-api-reference/qwen-tts-realtime-java-sdk.md)
 - [非实时语音合成CosyVoice Java SDK参考](../../raw/model-api-reference/speech-synthesis-api-reference/non-realtime-cosyvoice-api/cosyvoice-tts-java-sdk.md)
 - [非实时语音合成CosyVoice Python SDK参考](../../raw/model-api-reference/speech-synthesis-api-reference/non-realtime-cosyvoice-api/cosyvoice-tts-python-sdk.md)
 - [MiniMax同步语音合成API参考](../../raw/model-api-reference/speech-synthesis-api-reference/minimax-speech-synthesis/minimax-synchronous-speech-synthesis-api.md)
-- [声音复刻HTTP API参考](../../raw/model-api-reference/speech-synthesis-api-reference/sound-reengraving/voice-clone-design-http-api.md)
 - [声音复刻Java SDK参考](../../raw/model-api-reference/speech-synthesis-api-reference/sound-reengraving/voice-clone-design-java-sdk.md)
+- [声音复刻HTTP API参考](../../raw/model-api-reference/speech-synthesis-api-reference/sound-reengraving/voice-clone-design-http-api.md)
 - [声音复刻Python SDK参考](../../raw/model-api-reference/speech-synthesis-api-reference/sound-reengraving/voice-clone-design-python-sdk.md)
 

@@ -1,97 +1,88 @@
-# Token 计量与计费
+# Token
 
-Token 是百炼平台衡量模型输入与输出文本量的基本单位，也是模型推理和训练费用计算的核心依据。百炼平台围绕 Token 构建了完整的计量、统计与计费体系，覆盖模型推理调用、模型训练、模型部署等场景。
+Token 是大语言模型处理文本的基本计量单位。模型在推理时，会将输入文本拆分为一系列 Token 进行理解和生成，因此 Token 既是衡量模型处理量的核心指标，也是百炼平台计费、监控和资源管理的基础度量。
 
----
+## 什么是 Token
 
-## 计费场景与方式
+Token 不等同于字或词。一个中文汉字通常对应 1～2 个 Token，一个英文单词通常对应 1～4 个 Token，具体取决于模型所使用的分词器（Tokenizer）。在百炼平台中，1M Token 约等于 70 万汉字。
 
-| 场景 | 计费方式 | 说明 |
-|------|---------|------|
-| **模型推理（调用）** | 输入/输出 Token 分别计价，按量后付费 | 大语言模型以 Token 为单位；图像按张、视频按秒、语音按秒/字符/Token |
-| **模型训练** | 按训练 Token 总量计费 | 费用 =（训练数据 Token + 混合数据 Token）× 循环次数（`n_epochs`）× 单价 |
-| **模型部署** | 按时长 / 按 Token 用量 / 包月预付费 | 部分部署模式仍以 Token 为计量维度 |
-| **Token Plan 团队版** | Token 消耗抵扣 Credits | 独立计费体系，与按量付费的 API Key 不互通 |
+每次模型调用产生的 Token 分为两部分：
 
-详细单价参见 [[test-1]]。
-
----
-
-## 输入与输出 Token 分别计价
-
-调用文本生成模型时，**输入 Token**（Prompt、系统指令、上下文历史）和**输出 Token**（模型生成的回复）按不同单价分别计费。以 `qwen-plus` 中国内地为例：输入 0.8 元/百万 Token，输出另计。同一模型在不同部署地域（中国内地、新加坡、弗吉尼亚等）单价差异显著。
-
-### 阶梯计费
-
-部分模型（如 `qwen3-max`）实行阶梯计费——单价由**单次请求的输入 Token 总量**所在区间决定，该请求所有 Token 按对应阶梯统一结算。例如分 0–32K、32K–128K、128K–256K 三档。
-
-### Batch 调用与上下文缓存的折扣
-
-- **Batch 调用**：输入/输出单价按实时推理的 **50%** 计费。
-- **上下文缓存**：仅输入 Token 享有折扣。
-- 两者**不可同时生效**。
-
----
-
-## 训练场景中的 Token 计量
-
-模型调优（Fine-tuning）费用直接与训练 Token 数量挂钩，受以下参数影响：
-
-| 参数 | 影响 |
+| 类型 | 说明 |
 |------|------|
-| `n_epochs` | 训练循环次数，直接乘以 Token 总量计费 |
-| `max_length` | 单条数据最大 Token 长度，超出则丢弃该条数据 |
-| `data_augmentation` | 开启混合训练后，混合数据的 Token 也计入总量按标准计费 |
+| **输入 Token** | 用户提交的 Prompt、系统指令、上下文历史等 |
+| **输出 Token** | 模型生成的回复内容，包括思考过程（如开启思考模式） |
 
-不同调优方式对数据量的要求差异很大：CPT（继续预训练）需 1000 万+ Token 的无标签文本，SFT 需 1000+ 条问答对，DPO 需 100+ 组偏好对。详见 [[fine-tuning]] 和 [[model-training]]。
+## 计费中的 Token
 
----
+百炼平台的大语言模型按量付费以 Token 为核心计费单位，输入 Token 和输出 Token 分别定价。例如：
 
-## Token 用量监控与统计
+- `qwen3.7-max`：输入 12 元/百万 Token，输出 36 元/百万 Token
+- `qwen3.6-plus`：输入 2 元/百万 Token（≤256K），输出 12 元/百万 Token
 
-百炼通过 [[model-monitoring]] 提供多层级的 Token 用量可观测能力：
+**抵扣顺序**：免费额度 > 资源包 > 其他模型节省计划 > AI 通用型节省计划 > 按量付费。
 
-| 功能 | 粒度 | 说明 |
-|------|------|------|
-| **用量统计** | 按业务空间 + 模型 | 查看各模型的调用量和 Token 消耗，数据延迟约 1 小时 |
-| **模型日志** | 单次调用 | 查看每次请求的输入/输出 Token 明细，分钟级延迟 |
-| **高级监控** | 分钟级采集 | 通过 `model_usage` 指标查询 Token 用量，支持 Prometheus API 接入 Grafana |
-| **应用观测** | Span 级别 | 追踪应用内各节点的 Token 总量、输入/输出 Token，支持按 Token 量筛选 |
+在 Token Plan 团队版中，单次调用的 Credits 消耗由模型类型、输入/缓存/输出 Token 用量共同决定。Coding Plan 则按调用次数计量，不直接按 Token 计费。
 
-用量统计按模型类型使用不同单位：大语言模型按 Token，图像按张，视频按秒，语音按秒/字符/Token，全模态模型各模态分别计算 Token。
+> **注意**：不同模态的模型计量单位不同。大语言模型和向量模型按 Token 计量，图像生成按张计量，视频和语音按秒计量。
 
-应用观测（[[application-monitoring]]）中可按 Token 总量、输入 Token、输出 Token 筛选 Span，并查看平均单次请求 Token 量等聚合指标。
+## 上下文窗口与 Token 限制
 
----
+上下文窗口（Context Window）定义了模型单次调用能处理的最大 Token 总量（输入 + 输出），是选型的关键参数：
 
-## 关键参数与配置
+| 上下文窗口 | 代表模型 |
+|-----------|---------|
+| 1M Token | `qwen3.7-max`、`qwen3.6-plus`、`qwen3.6-flash`、`deepseek-v4-pro` |
+| 256K Token | `qwen3.6-max-preview`、`kimi-k2.6` |
+| 128K～198K Token | `glm-5.1`（198K）、`MiniMax-M2.5`（192K） |
 
-### 计费相关 API 响应字段
+开启思考模式时，思考内容也会占用 Token 预算。不同模型的思考预算（Thinking Budget）不同，如 `qwen3.7-max` 为 256K Token，`qwen3.6-flash` 为 128K Token。
 
-调用文本生成模型后，API 响应中会返回 `usage` 对象，包含 `[[prompt|prompt]]_tokens`（输入）、`completion_tokens`（输出）和 `total_tokens`（合计），可用于应用侧的 Token 消耗追踪。
+## 关键参数
 
-### 免费额度与用量控制
+| 参数 | 说明 | 使用场景 |
+|------|------|---------|
+| `max_tokens` | 限制模型单次输出的最大 Token 数 | 控制输出长度和成本 |
+| `enable_thinking` | 开启思考模式，模型逐步推理后再输出 | 复杂推理任务，会增加输出 Token 消耗 |
+| `dimensions` | 向量模型输出维度（非 Token 参数，但输入受 Token 限制） | 向量检索场景 |
 
-- 首次开通百炼（中国内地版）自动获得新人免费额度，有效期 30–90 天，仅抵扣实时推理费用。
-- 开启「**免费额度用完即停**」可在额度耗尽时返回错误码 `AllocationQuota.FreeTierOnly`，防止意外扣费。
+向量模型同样受 Token 限制约束：`text-embedding-v4` 单行最大 8,192 Token，`text-embedding-v2` 单行最大 2,048 Token。
 
-### 账单字段
+## 监控与观测中的 Token
 
-账单中 `实例 ID` 字段格式为：`ApiKeyID;业务空间ID;模型名称;输入输出类型;调用渠道;免费额度用完即停标识`，可追溯至具体调用来源。
+### 模型监控
 
----
+在模型监控中，Token 相关的核心指标包括：
 
-## 成本优化
+- **TPM**（Tokens Per Minute）：每分钟处理的 Token 数
+- **平均单次请求调用量**：单次调用的平均 Token 消耗
+- **model_usage**：PromQL 指标，用于在 Grafana 等工具中查询 Token 用量
 
-抵扣优先
+用量统计页面支持按业务空间维度查看 Token 消耗趋势，数据延迟约 1 小时，支持查看最近 30 天的数据。
+
+### 应用观测
+
+在应用观测中，可以按以下维度筛选和统计 Token：
+
+- **Token 总量**、**输入 Token**、**输出 Token**：支持数值比较过滤
+- **监控统计**：展示 Token 总量趋势、平均单次请求 Token 量等聚合指标
+- **LLM 节点**：Token 量 = 输入 Token + 输出 Token
+
+## 成本优化建议
+
+- **合理设置 `max_tokens`**：避免模型生成不必要的冗长输出。
+- **按任务选模型**：简单任务优先使用轻量级模型（如 `qwen3.6-flash`），降低单 Token 成本。
+- **优化 Prompt**：精简输入内容，减少无效的输入 Token。
+- **使用批量推理**：对延迟要求不高的场景，输入和输出单价按实时推理的 50% 计费。
+- **利用上下文缓存**：重复前缀的请求可享受输入 Token 折扣。
+- **配置用量告警**：通过模型监控对 Token 消耗设置告警阈值，及时发现异常。
 
 ## 关联主题页
 
-- [[test-1|test 1]] — `../guides/test-1.md`
-- [[token-plan-guide|token plan guide]] — `../guides/token-plan-guide.md`
-- [[model-monitoring|model monitoring]] — `../guides/model-monitoring.md`
-- [[application-monitoring|application monitoring]] — `../guides/application-monitoring.md`
-- [[model-training|model training]] — `../api/model-training.md`
-- [[fine-tuning|fine tuning]] — `../guides/fine-tuning.md`
-- [[qwen-api-reference|qwen api reference]] — `../api/qwen-api-reference.md`
+- [token plan guide](../guides/token-plan-guide.md)
+- [model monitoring](../guides/model-monitoring.md)
+- [application monitoring](../guides/application-monitoring.md)
+- [test 1](../guides/test-1.md)
+- [model inference](../guides/model-inference.md)
+- [general text embedding](../api/general-text-embedding.md)
 

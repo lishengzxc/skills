@@ -1,147 +1,119 @@
 # model training
 
-百炼平台提供模型调优（Fine-tuning）能力，支持对文本生成、视觉理解、语音合成、视频生成以及语音识别等多种模型进行训练和定制。开发者可通过 HTTP API 或 SDK 完成训练数据上传、调优任务创建、任务状态查询等全流程操作。本文汇总了模型训练相关的核心概念、支持的模型类型、关键参数及使用方式。
+百炼平台提供模型调优（fine-tuning）能力，支持对文本生成、视觉理解、语音合成、视频生成以及语音识别等多种模型进行定制训练。开发者可通过 HTTP API 完成文件上传、任务创建、状态查询和任务管理的全流程操作。本文汇总了模型调优相关的核心概念、支持的模型类型、关键参数及使用方式。
 
-## 支持的模型与训练类型
+## 支持的模型与训练方式
 
-百炼平台的模型训练覆盖以下场景：
+百炼平台支持以下几类模型的调优：
 
-| 场景 | 支持模型（示例） | 训练类型 |
-|------|------------------|----------|
-| 文本生成 / 视觉理解 | Qwen3 系列、Qwen-VL 系列 | `sft`、`efficient_sft`、`cpt`、`dpo_full`、`dpo_lora` |
-| 语音合成 | `cosyvoice-v3-flash` | `efficient_sft` |
-| 视频生成（图生视频） | `wan2.5-i2v-preview`、`wan2.2-i2v-flash`、`wan2.2-kf2v-flash` | `efficient_sft` |
-| 语音识别热词 | Paraformer 系列 | `compile_asr_phrase` |
+| 模型类别 | 代表模型 | 支持的训练方式 | 参考文档 |
+|---------|---------|--------------|---------|
+| 文本生成 | qwen3-14b 等千问系列 | `sft`、`efficient_sft`、`cpt`、`dpo_full`、`dpo_lora` | [模型调优 API 参考](../../raw/model-api-reference/model-training/model-training-api-reference.md) |
+| 视觉理解 | 千问-VL 系列 | `sft`、`efficient_sft` | [模型调优 API 参考](../../raw/model-api-reference/model-training/model-training-api-reference.md) |
+| 语音合成 | cosyvoice-v3-flash | `efficient_sft` | [模型调优 API 参考](../../raw/model-api-reference/model-training/model-training-api-reference.md) |
+| 视频生成（图生视频） | wan2.5-i2v-preview、wan2.2-i2v-flash、wan2.2-kf2v-flash | `efficient_sft` | [视频生成模型微调API参考](../../raw/model-api-reference/model-training/wan-video-generation-finetune-api-reference.md) |
+| 语音识别（热词） | paraformer-realtime-v1、paraformer-v1 等 | `compile_asr_phrase` | [paraformer热词](../../raw/model-api-reference/model-training/paraformer-asr-phrase-manager.md) |
 
-详细的基础模型 ID 及训练方式组合，请参阅 [模型调优 API 参考](../../raw/model-api-reference/model-training/model-training-api-reference.md) 中的说明。视频生成模型的微调流程与参数有所不同，具体见 [视频生成模型微调API参考](../../raw/model-api-reference/model-training/wan-video-generation-finetune-api-reference.md)。
+## 整体流程
 
-## 整体工作流程
+模型调优的典型流程为：
 
-1. **上传训练数据** — 通过文件管理 API 上传训练文件，获取 `file_id`。
-2. **创建调优任务** — 指定基础模型、训练文件 ID、超参数等，发起训练。
-3. **查询任务状态** — 轮询任务状态，直到 `SUCCEEDED` 或其他终态。
-4. **使用/部署模型** — 训练完成后，通过返回的 `finetuned_output` 模型 ID 进行推理或部署。
+1. **上传训练数据** — 调用文件管理 API 上传训练文件，获取 `file_id`
+2. **创建调优任务** — 指定基础模型、训练文件 ID 和超参数，发起训练
+3. **查询任务状态** — 轮询任务状态，直到 `SUCCEEDED` 或 `FAILED`
+4. **部署/使用模型** — 训练成功后，使用产出的模型 ID 进行推理调用
 
 ## 文件管理
 
-训练数据通过 [百炼文件管理 API](../../raw/model-api-reference/model-training/model-customization-file-management-service.md) 统一管理，一次上传可在多个任务中复用。
+训练数据通过 [百炼文件管理 API](../../raw/model-api-reference/model-training/model-customization-file-management-service.md) 进行上传和管理。上传时 `purpose` 设为 `fine-tune`，返回的 `file_id` 用于后续创建调优任务。
 
-**核心接口：**
+**接口端点：**
 
-| 操作 | 方法 | 端点 |
-|------|------|------|
-| 上传文件 | `POST` | `/api/v1/files` |
-| 列举文件 | `GET` | `/api/v1/files` |
-| 查询文件 | `GET` | `/api/v1/files/{file_id}` |
-| 删除文件 | `DELETE` | `/api/v1/files/{file_id}` |
-
-上传时 `purpose` 字段设为 `fine-tune` 即用于模型调优。也支持 `file-extract`（[[qwen-long]] 长上下文分析）和 `batch`（[[batch]] 批量任务）等用途。
+| 操作 | 方法 | URL |
+|------|------|-----|
+| 上传文件 | `POST` | `https://dashscope.aliyuncs.com/api/v1/files` |
+| 列举文件 | `GET` | `https://dashscope.aliyuncs.com/api/v1/files` |
+| 获取文件详情 | `GET` | `https://dashscope.aliyuncs.com/api/v1/files/{file_id}` |
+| 删除文件 | `DELETE` | `https://dashscope.aliyuncs.com/api/v1/files/{file_id}` |
 
 **使用限制：**
+
 - 单个文件最大 1GB
-- 有效文件（未删除）总空间配额 5GB
-- 有效文件（未删除）总数量配额 100 个
+- 有效文件总使用空间配额 5GB
+- 有效文件总数量配额 100 个
 
-## 关键超参数
+## 创建调优任务
 
-### 文本生成 / 视觉理解模型
+**接口：** `POST https://dashscope.aliyuncs.com/api/v1/fine-tunes`
 
-以下参数中 `n_epochs`、`batch_size`、`max_length` 为**必填**项，直接影响训练费用：
+### 核心输入参数
 
-| 参数 | 类型 | 说明 |
+| 参数 | 必选 | 说明 |
 |------|------|------|
-| `n_epochs` | Integer | 训练循环次数。数据量 < 10,000 推荐 3~5 次；> 10,000 推荐 1~2 次 |
-| `batch_size` | Integer | 批次大小，不同模型默认值不同 |
-| `max_length` | Integer | 单条数据最大 token 长度，超出的数据将被丢弃，推荐 8192 |
-| `learning_rate` | Float | 学习率，推荐使用默认值 |
-| `lr_scheduler_type` | String | 学习率调整策略，推荐 `linear` 或 `inverse_sqrt` |
-| `split` | Float | 训练集占比（未指定验证集时生效），默认 0.8~0.9 |
+| `model` | 是 | 基础模型 ID，或已调优模型的 ID（二次调优） |
+| `training_file_ids` | 是 | 训练集文件 ID 数组 |
+| `validation_file_ids` | 否 | 验证集文件 ID 数组；不提供时系统自动按比例划分 |
+| `training_type` | 否（视频生成模型为必选） | 训练方法：`sft`、`efficient_sft`、`cpt`、`dpo_full`、`dpo_lora` |
+| `hyper_parameters` | 否 | 超参数配置，不同模型支持的参数集合不同 |
 
-**高效微调（LoRA）参数**（适用于 `efficient_sft`、`dpo_lora`）：
+### 关键超参数
+
+#### 文本生成 / 视觉理解模型
 
 | 参数 | 说明 | 推荐值 |
 |------|------|--------|
-| `lora_rank` | 低秩矩阵秩值 | 64 |
-| `lora_alpha` | LoRA 缩放系数 | 使用默认值 |
-| `lora_dropout` | 丢弃率 | 使用默认值 |
+| `n_epochs` **【必填】** | 训练循环次数 | 数据量 < 10000 时 3~5，> 10000 时 1~2 |
+| `batch_size` **【必填】** | 批次大小 | 使用默认值 |
+| `max_length` **【必填】** | 单条数据最大 token 长度，超长数据将被丢弃 | 8192 |
+| `learning_rate` | 学习率 | 使用默认值 |
+| `lr_scheduler_type` | 学习率调整策略 | `linear` 或 `inverse_sqrt` |
+| `split` | 训练集占比（无验证集时生效） | 0.8~0.9 |
 
-> **注意**：对已高效微调的模型进行二次微调时，`lora_rank`、`lora_alpha`、`lora_dropout` 三个参数**必须**与首次保持一致。
+高效微调（`efficient_sft`、`dpo_lora`）还支持 `lora_rank`、`lora_alpha`、`lora_dropout` 等 LoRA 参数。
 
-**混合训练参数**（适用于 `efficient_sft`、`sft`）：开启 `data_augmentation` 后，训练数据将与百炼提供的通用数据集混合，可提升效果、避免能力退化，但混合数据计入总训练 Token 按标准计费。
+> **注意**：对已经高效微调后的模型进行二次微调时，`lora_rank`、`lora_alpha`、`lora_dropout` 三个参数必须与首次保持一致。
 
-**模型参数快照发布**（适用于 `efficient_sft`、`sft`）：通过 `save_strategy`、`save_steps`、`save_total_limit` 控制 Checkpoint 保存策略。
+#### 视频生成模型
 
-### 视频生成模型
+视频生成模型的超参数与文本模型有所不同，增加了 `eval_epochs`（验证间隔）和 `max_pixels`（训练视频最大分辨率）等专用参数，且 `batch_size` 为固定值（wan2.5 为 2，wan2.2 为 4）。详见 [视频生成模型微调API参考](../../raw/model-api-reference/model-training/wan-video-generation-finetune-api-reference.md)。
 
-视频模型使用独立的超参数集，部分参数含义与文本模型相同但默认值和取值范围不同：
+#### CosyVoice 语音合成模型
 
-| 参数 | 说明 | wan2.5 默认 | wan2.2 默认 |
-|------|------|-------------|-------------|
-| `n_epochs` | 训练轮数 | 400 | 400 |
-| `batch_size` | 批次大小 | 2 | 4 |
-| `learning_rate` | 学习率 | 2e-5 | 2e-5 |
-| `max_pixels` | 最大视频分辨率（宽×高像素数） | 36864 | 262144 |
-| `eval_epochs` | 验证间隔（epoch） | 50 | 50 |
+CosyVoice（`cosyvoice-v3-flash`）有独立的 8 个超参数（`lm_max_epoch`、`lm_step`、`lm_num`、`lm_batch_size`、`fm_max_epoch`、`fm_step`、`fm_num`、`fm_batch_size`），**全部必填**，不可与文本模型的 `n_epochs` 等混用。
 
-> **注意**：视频模型使用 `eval_epochs` 作为验证间隔参数，而文本模型使用 `eval_steps`（按步数）。两者不可混用。
+### 混合训练
 
-### CosyVoice 语音合成模型
+文本生成模型的 `sft` 和 `efficient_sft` 支持混合训练（`data_augmentation`），训练数据将与百炼提供的通用数据集混合，以提升训练效果、避免模型能力退化。需配合 `augmentation_types` 和 `augmentation_ratio` 使用。
 
-仅适用于 `cosyvoice-v3-flash`，8 个 LM/FM 超参**全部必填**，与文本模型的 `n_epochs`、`batch_size`、`max_length` 不可混用。详见 [模型调优 API 参考](../../raw/model-api-reference/model-training/model-training-api-reference.md) 中的 CosyVoice 章节。
+## 任务状态
 
-### Paraformer 热词
-
-热词是语音识别场景的特殊"训练"方式，通过 `AsrPhraseManager` SDK 管理，支持创建、查询、更新、删除和列举热词。热词列表最大 500 个，权重取值 `[1, 5]`（提高识别概率）或 `[-6, -1]`（降低识别概率）。详见 [paraformer热词](../../raw/model-api-reference/model-training/paraformer-asr-phrase-manager.md)。
-
-## 调优任务 API
-
-### 创建任务
-
-```
-POST https://dashscope.aliyuncs.com/api/v1/fine-tunes
-Content-Type: application/json
-Authorization: Bearer ${DASHSCOPE_API_KEY}
-```
-
-请求体核心字段：
-
-| 字段 | 必选 | 说明 |
-|------|------|------|
-| `model` | 是 | 基础模型 ID，或已调优模型 ID（支持二次调优） |
-| `training_file_ids` | 是 | 训练集文件 ID 数组 |
-| `validation_file_ids` | 否 | 验证集文件 ID 数组，未提供时自动从训练集按 `split` 比例划分 |
-| `training_type` | 否 | 训练方式：`sft`、`efficient_sft`、`cpt`、`dpo_full`、`dpo_lora` |
-| `hyper_parameters` | 否 | 超参数配置（不同模型参数集合不同） |
-
-### 查询任务
-
-```
-GET https://dashscope.aliyuncs.com/api/v1/fine-tunes/{job_id}
-```
-
-### 任务状态
+所有调优任务共享统一的状态机：
 
 | 状态 | 含义 |
 |------|------|
-| `PENDING` | 待开始 |
-| `QUEUING` | 排队中（同时仅一个任务可执行） |
-| `RUNNING` | 进行中 |
+| `PENDING` | 训练待开始 |
+| `QUEUING` | 正在排队（同时只有一个训练任务可以进行） |
+| `RUNNING` | 训练进行中 |
+| `CANCELING` | 正在取消 |
 | `SUCCEEDED` | 训练成功 |
 | `FAILED` | 训练失败 |
-| `CANCELING` | 取消中 |
 | `CANCELED` | 已取消 |
 
-训练成功后，返回的 `output.finetuned_output` 即为可用于推理或 [[model-deployment]] 的模型 ID。
+查询任务状态：`GET https://dashscope.aliyuncs.com/api/v1/fine-tunes/{job_id}`
 
-## 限制和注意事项
+## 语音识别热词
 
-- **地域限制**：模型调优 API 仅适用于中国大陆版（北京地域），需使用该地域的 [[api-key]]。
-- **并发限制**：同一时间仅允许一个训练任务运行，其余任务排队等待。
-- **文件配额**：有效文件数量上限 100 个、总空间 5GB。
-- **数据丢弃**：单条训练数据 token 超过 `max_length` 时会被直接丢弃。
-- **费用相关**：`n_epochs`、`batch_size`、`max_length` 影响训练费用；混合训练的增补数据也计入计费 Token。
-- **视觉模型特殊参数**：`freeze_vit` 设置为 `true` 时，千问-VL 模型才支持按 Token 用量计费。
-- **视频模型训练时长**：视频生成模型微调需**数小时**，具体耗时取决于基础模型和数据量。
+Paraformer 语音识别模型支持通过热词功能改善特定词汇的识别效果。热词通过 SDK 中的 `AsrPhraseManager` 类管理，支持创建、查询、更新和删除操作。热词列表最多 500 个词，权重范围为 `[1, 5]`（提高识别概率）和 `[-6, -1]`（降低识别概率）。
+
+## 限制与注意事项
+
+- **地域限制**：模型调优 API 仅适用于中国大陆版（北京地域）。
+- **并发限制**：同时只有一个训练任务可以进行，其余任务处于 `QUEUING` 状态。
+- **文件限制**：单文件最大 1GB，有效文件总空间 5GB，总数量 100 个。
+- **数据截断**：文本模型训练中，单条数据 token 超过 `max_length` 的将被直接丢弃。
+- **视频模型训练时长**：视频生成模型的微调任务通常需要数小时，请耐心等待。
+- **VL 模型计费**：千问-VL 模型仅在 `freeze_vit` 设为 `true` 时才能按 Token 用量计费。
+- 所有 API 请求需携带 `Authorization: Bearer ${DASHSCOPE_API_KEY}` 头部。
 
 ## 来源文档
 

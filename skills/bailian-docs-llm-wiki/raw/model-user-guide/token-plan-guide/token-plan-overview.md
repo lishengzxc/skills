@@ -249,16 +249,9 @@ Token Plan 团队版 - 共享用量包
 
 ## **查看额度消耗情况**
 
-### **查看团队总览**
+**通过控制台**：登录[Token Plan 控制台](https://bailian.console.aliyun.com/?tab=plan#/efm/subscription/token-plan)，在**我的订阅**页面查看总额度使用百分比、重置时间、团队席位分配情况，以及各席位与共享用量包的状态和到期时间。
 
--   登录[Token Plan 控制台](https://bailian.console.aliyun.com/?tab=plan#/efm/subscription/token-plan)，在**我的订阅**页面选择 **Token Plan** 页签，查看当前套餐的总额度使用百分比和席位信息。
-    
--   登录[费用中心 Token Plan 页面](https://billing-cost.console.aliyun.com/token-plan/summary)，查看总 Credits、剩余量、到期倒计时等汇总信息，以及按时间维度的使用明细。
-    
-
-### **查看成员消耗明细**
-
-在管理平台的**用量分析**页面，可查看用量趋势、各模型消耗，以及每个成员的 Credits 消耗明细。详见[团队管理](https://help.aliyun.com/zh/model-studio/token-plan-team)。
+**通过团队管理平台**：在**用量分析**页面，可查看近 1、7、30 天的 Credits 消耗趋势、各模型用量，以及每个成员的消耗明细。详见[团队管理](https://help.aliyun.com/zh/model-studio/token-plan-team)。
 
 ## **使用细则**
 
